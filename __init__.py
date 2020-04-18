@@ -125,8 +125,8 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
     bl_label = "Export OpenGEX"
     filename_ext = ".ogex"
 
-    option_export_selection = bpy.props.BoolProperty(name = "Export Selection Only", description = "Export only selected objects", default = False)
-    option_sample_animation = bpy.props.BoolProperty(name = "Force Sampled Animation", description = "Always export animation as per-frame samples", default = False)
+    option_export_selection: bpy.props.BoolProperty(name = "Export Selection Only", description = "Export only selected objects", default = False)
+    option_sample_animation: bpy.props.BoolProperty(name = "Force Sampled Animation", description = "Always export animation as per-frame samples", default = False)
 
     def Write(self, text):
         self.file.write(text)
@@ -2493,7 +2493,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             print(f"Exporting camera {objectRef[0]}")
             self.ExportCamera(objectRef)
 
-    def ExportTexture(self, textureSlot, attrib):
+    def ExportTexture(self, texture, attrib):
+        directory = os.path.dirname(self.filepath)
+        ogex_base = os.path.basename(self.filepath)
+
+        uri = texture.index.source.uri
+        filename = f"{ogex_base}_{uri.name}{uri.file_extension}"
+        path = os.path.join(directory, filename)
+
+        # Write texture data to external file
+        with open(path, 'wb') as f:
+            f.write(uri.data)
+
         # This function exports a single texture from a material.
         self.IndentWrite(B"Texture (attrib = \"", 0, True)
         self.Write(attrib)
@@ -2503,15 +2514,15 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel += 1
 
         self.IndentWrite(B"string {\"")
-        self.WriteFileName(textureSlot.texture.image.filepath)
+        self.WriteFileName(filename)
         self.Write(B"\"}\n")
 
         # TODO(dlb): Do these props still exist in 2.8? If not, check how glTF finds texture transforms
         # If the texture has a scale and/or offset, then export a coordinate transform.
-        uscale = textureSlot.scale[0]
-        vscale = textureSlot.scale[1]
-        uoffset = textureSlot.offset[0]
-        voffset = textureSlot.offset[1]
+        uscale = 1.0 #textureSlot.scale[0]
+        vscale = 1.0 #textureSlot.scale[1]
+        uoffset = 0.0 #textureSlot.offset[0]
+        voffset = 0.0 #textureSlot.offset[1]
 
         if ((uscale != 1.0) or (vscale != 1.0) or (uoffset != 0.0) or (voffset != 0.0)):
             matrix = [[uscale, 0.0, 0.0, 0.0], [0.0, vscale, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [uoffset, voffset, 0.0, 1.0]]
@@ -2536,16 +2547,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         for materialRef in self.materialArray.items():
             material = materialRef[0]
 
-            self.Write(B"\nMaterial $")
-            self.Write(materialRef[1]["structName"])
-            self.Write(B"\n{\n")
-            self.indentLevel += 1
-
-            if (material.name != ""):
-                self.IndentWrite(B"Name {string {\"")
-                self.Write(bytes(material.name, "UTF-8"))
-                self.Write(B"\"}}\n\n")
-
             print(f"Material {material.name} nodes:")
             for n in material.node_tree.nodes:
                 print(f"  {n}")
@@ -2555,17 +2556,28 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             #alpha_cutoff       = gather_alpha_cutoff(material)
             #alpha_mode         = gather_alpha_mode(material)
             alpha_factor       = gather_alpha_factor(material)
+            print(f"alpha_factor: {alpha_factor}")
             alpha_texture      = gather_alpha_texture(material)
-            base_color_factor  = gather_base_color_factor(material)
-            base_color_texture = gather_base_color_texture(material)
+            print(f"alpha_texture: {alpha_texture}")
+            diffuse_factor  = gather_diffuse_factor(material)
+            print(f"diffuse_factor: {diffuse_factor}")
+            diffuse_texture = gather_diffuse_texture(material)
+            print(f"diffuse_texture: {diffuse_texture}")
             emissive_factor    = gather_emissive_factor(material)
+            print(f"emissive_factor: {emissive_factor}")
             emissive_texture   = gather_emissive_texture(material)
+            print(f"emissive_texture: {emissive_texture}")
             metallic_factor    = gather_metallic_factor(material)
+            print(f"metallic_factor: {metallic_factor}")
             metallic_texture   = gather_metallic_texture(material)
+            print(f"metallic_texture: {metallic_texture}")
             normal_texture     = gather_normal_texture(material)
+            print(f"normal_texture: {normal_texture}")
             #occlusion_texture  = gather_occlusion_texture(material)
             roughness_factor   = gather_roughness_factor(material)
+            print(f"roughness_factor: {roughness_factor}")
             roughness_texture  = gather_roughness_texture(material)
+            print(f"roughness_texture: {roughness_texture}")
 
             # TODO(dlb): Check that textures which are going to be channel-combined have the same resolution
             # def tex_resolution_match(sockets: typing.Tuple[bpy.types.NodeSocket]):
@@ -2581,22 +2593,51 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             #     return True
 
-            self.IndentWrite(B"Color (attrib = \"diffuse\") {float[3] {")
-            self.WriteColor(diffuse)
-            self.Write(B"}}\n")
+            if (alpha_factor):
+                self.IndentWrite(B"Color (attrib = \"alpha\") {float {")
+                self.WriteColor(alpha_factor)
+                self.Write(B"}}\n")
+            if (diffuse_factor):
+                self.IndentWrite(B"Color (attrib = \"diffuse\") {float[3] {")
+                self.WriteColor(diffuse_factor)
+                self.Write(B"}}\n")
+            if (emissive_factor):
+                self.IndentWrite(B"Color (attrib = \"emissive\") {float[3] {")
+                self.WriteColor(emissive_factor)
+                self.Write(B"}}\n")
+            if (metallic_factor):
+                self.IndentWrite(B"Color (attrib = \"metallic\") {float {")
+                self.WriteColor(metallic_factor)
+                self.Write(B"}}\n")
+            if (roughness_factor):
+                self.IndentWrite(B"Color (attrib = \"roughness\") {float {")
+                self.WriteColor(roughness_factor)
+                self.Write(B"}}\n")
 
             # TODO(dlb): Export factors if textures don't exist? Or both? Mix? Something?
             # TODO(dlb): Pack channels during export?
             if (alpha_texture):
                 self.ExportTexture(alpha_texture, B"alpha")
-            if (base_color_texture):
-                self.ExportTexture(base_color_texture, B"diffuse")
+            if (diffuse_texture):
+                self.ExportTexture(diffuse_texture, B"diffuse")
             if (emissive_texture):
                 self.ExportTexture(emissive_texture, B"emission")
-            if (metallic_roughness_texture):
-                self.ExportTexture(metallic_roughness_texture, B"metallic_roughness")
+            if (metallic_texture):
+                self.ExportTexture(metallic_texture, B"metallic")
+            if (roughness_texture):
+                self.ExportTexture(roughness_texture, B"roughness")
             if (normal_texture):
                 self.ExportTexture(normal_texture, B"normal")
+
+            self.Write(B"\nMaterial $")
+            self.Write(materialRef[1]["structName"])
+            self.Write(B"\n{\n")
+            self.indentLevel += 1
+
+            if (material.name != ""):
+                self.IndentWrite(B"Name {string {\"")
+                self.Write(bytes(material.name, "UTF-8"))
+                self.Write(B"\"}}\n\n")
 
             self.indentLevel -= 1
             self.Write(B"}\n")
@@ -2687,8 +2728,7 @@ def unregister():
     bpy.types.TOPBAR_MT_file_export.remove(menu_func)
     bpy.utils.unregister_class(OpenGexExporter)
 
-if __name__ == "__main__":
-    register()
+
 
 
 
@@ -2717,9 +2757,9 @@ class ImageData:
         return hash(self._data)
 
     def adjusted_name(self):
-        regex_dot = re.compile("\.")
+        regex_dot = re.compile(".")
         adjusted_name = re.sub(regex_dot, "_", self.name)
-        new_name = "".join([char for char in adjusted_name if char not in "!#$&'()*+,/:;<>?@[\]^`{|}~"])
+        new_name = "".join([char for char in adjusted_name if char not in "!#$&'()*+,/:;<>?@[\\]^`{|}~"])
         return new_name
 
     @property
@@ -3252,12 +3292,12 @@ def gather_alpha_texture(blender_material):
     alpha_socket = get_material_socket(blender_material, "Alpha")
     return gather_texture_info(alpha_socket)
 
-def gather_base_color_factor(blender_material):
-    base_color_socket = get_material_socket(blender_material, "Base Color")
-    if base_color_socket and not base_color_socket.is_linked:
-        return list(base_color_socket.default_value)
+def gather_diffuse_factor(blender_material):
+    diffuse_socket = get_material_socket(blender_material, "Base Color")
+    if diffuse_socket and not diffuse_socket.is_linked:
+        return list(diffuse_socket.default_value)
 
-    tex = get_tex_from_socket(base_color_socket)
+    tex = get_tex_from_socket(diffuse_socket)
     if not tex:
         return None
 
@@ -3285,19 +3325,9 @@ def gather_base_color_factor(blender_material):
 
     return list(factor_socket.default_value)
 
-def gather_base_color_texture(blender_material):
-    base_color_socket = get_material_socket(blender_material, "Base Color")
-
-    alpha_socket = get_material_socket(blender_material, "Alpha")
-    if alpha_socket is not None and alpha_socket.is_linked:
-        sockets = (base_color_socket, alpha_socket, )
-    else:
-        sockets = (base_color_socket,)
-
-    if not filter_texture_info(sockets):
-        return None
-
-    return gather_texture_info(sockets)
+def gather_diffuse_texture(blender_material):
+    diffuse_socket = get_material_socket(blender_material, "Base Color")
+    return gather_texture_info(diffuse_socket)
 
 def gather_metallic_factor(blender_material):
     metallic_socket = get_material_socket(blender_material, "Metallic")
@@ -3385,9 +3415,9 @@ def from_socket(start_socket: bpy.types.NodeSocket, shader_node_filter_type) -> 
     :param shader_node_filter_type: should be a type to match node against
     :return: a list of shader nodes for which filter is true
     """
-    if not socket:
+    if not start_socket:
         return None
-    if not isinstance(socket, bpy.types.NodeSocket):
+    if not isinstance(start_socket, bpy.types.NodeSocket):
         return None
 
     # hide implementation (especially the search path)
@@ -3622,3 +3652,9 @@ def gather_image_data(socket: bpy.types.NodeSocket) -> ExportImage:
         composed_image = ExportImage.from_blender_image(tex.shader_node.image)
 
     return composed_image
+
+
+
+
+if __name__ == "__main__":
+    register()
