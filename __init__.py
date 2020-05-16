@@ -41,6 +41,7 @@ from typing import Optional
 from bpy_extras.io_utils import ExportHelper
 
 log = logging.getLogger(__name__)
+kOutputColumns = 32
 
 kNodeTypeNode = 0
 kNodeTypeBone = 1
@@ -120,7 +121,6 @@ class ExportVertex:
         h = h * 21737 + hash(self.texcoord1[0])
         h = h * 21737 + hash(self.texcoord1[1])
         self.hash = h
-
 
 
 class OpenGexExporter(bpy.types.Operator, ExportHelper):
@@ -259,65 +259,31 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
     def WriteIntArray(self, valueArray):
         count = len(valueArray)
-        k = 0
 
-        lineCount = count >> 6
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(63):
-                self.WriteInt(valueArray[k])
-                self.Write(B", ")
-                k += 1
-
-            self.WriteInt(valueArray[k])
-            k += 1
-
-            if (i * 64 < count - 64):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteInt(valueArray[i])
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 63
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteInt(valueArray[k])
-                self.Write(B", ")
-                k += 1
-
-            self.WriteInt(valueArray[k])
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteFloatArray(self, valueArray):
         count = len(valueArray)
-        k = 0
 
-        lineCount = count >> 4
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(15):
-                self.WriteFloat(valueArray[k])
-                self.Write(B", ")
-                k += 1
-
-            self.WriteFloat(valueArray[k])
-            k += 1
-
-            if (i * 16 < count - 16):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteFloat(valueArray[i])
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 15
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteFloat(valueArray[k])
-                self.Write(B", ")
-                k += 1
-
-            self.WriteFloat(valueArray[k])
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteVector2D(self, vector):
         self.Write(B"{ x: ")
@@ -359,131 +325,60 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
     def WriteVertexArray2D(self, vertexArray, attrib):
         count = len(vertexArray)
-        k = 0
 
-        lineCount = count >> 3
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(7):
-                self.WriteVector2D(getattr(vertexArray[k], attrib))
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector2D(getattr(vertexArray[k], attrib))
-            k += 1
-
-            if (i * 8 < count - 8):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteVector2D(getattr(vertexArray[i], attrib))
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 7
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteVector2D(getattr(vertexArray[k], attrib))
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector2D(getattr(vertexArray[k], attrib))
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteVertexArray3D(self, vertexArray, attrib):
         count = len(vertexArray)
-        k = 0
 
-        lineCount = count >> 3
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(7):
-                self.WriteVector3D(getattr(vertexArray[k], attrib))
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector3D(getattr(vertexArray[k], attrib))
-            k += 1
-
-            if (i * 8 < count - 8):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteVector3D(getattr(vertexArray[i], attrib))
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 7
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteVector3D(getattr(vertexArray[k], attrib))
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector3D(getattr(vertexArray[k], attrib))
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteMorphPositionArray3D(self, vertexArray, meshVertexArray):
         count = len(vertexArray)
-        k = 0
 
-        lineCount = count >> 3
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(7):
-                self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].co)
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].co)
-            k += 1
-
-            if (i * 8 < count - 8):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteVector3D(meshVertexArray[vertexArray[i].vertexIndex].co)
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 7
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].co)
-                self.Write(B", ")
-                k += 1
-
-            self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].co)
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteMorphNormalArray3D(self, vertexArray, meshVertexArray, tessFaceArray):
         count = len(vertexArray)
-        k = 0
 
-        lineCount = count >> 3
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(7):
-                face = tessFaceArray[vertexArray[k].faceIndex]
-                self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].normal if (face.use_smooth) else face.normal)
-                self.Write(B", ")
-                k += 1
-
-            face = tessFaceArray[vertexArray[k].faceIndex]
-            self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].normal if (face.use_smooth) else face.normal)
-            k += 1
-
-            if (i * 8 < count - 8):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            face = tessFaceArray[vertexArray[i].faceIndex]
+            self.WriteVector3D(meshVertexArray[vertexArray[i].vertexIndex].normal if (face.use_smooth) else face.normal)
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 7
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                face = tessFaceArray[vertexArray[k].faceIndex]
-                self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].normal if (face.use_smooth) else face.normal)
-                self.Write(B", ")
-                k += 1
-
-            face = tessFaceArray[vertexArray[k].faceIndex]
-            self.WriteVector3D(meshVertexArray[vertexArray[k].vertexIndex].normal if (face.use_smooth) else face.normal)
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteTriangle(self, triangleIndex, indexTable):
         i = triangleIndex * 3
@@ -496,40 +391,22 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.Write(B"}")
 
     def WriteTriangleArray(self, count, indexTable):
-        triangleIndex = 0
-
-        lineCount = count >> 4
-        for i in range(lineCount):
-            self.IndentWrite(B"", 1)
-            for j in range(15):
-                self.WriteTriangle(triangleIndex, indexTable)
-                self.Write(B", ")
-                triangleIndex += 1
-
-            self.WriteTriangle(triangleIndex, indexTable)
-            triangleIndex += 1
-
-            if (i * 16 < count - 16):
-                self.Write(B",\n")
-            else:
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteTriangle(i, indexTable)
+            if i == count - 1:
                 self.Write(B"\n")
-
-        count &= 15
-        if (count != 0):
-            self.IndentWrite(B"", 1)
-            for j in range(count - 1):
-                self.WriteTriangle(triangleIndex, indexTable)
-                self.Write(B", ")
-                triangleIndex += 1
-
-            self.WriteTriangle(triangleIndex, indexTable)
-            self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
 
     def WriteNodeTable(self, objectRef):
         first = True
         for node in objectRef[1]["nodeTable"]:
             if (first):
-                self.Write(B"\t\t// ")
+                self.Write(B"  # Node Table: ")
             else:
                 self.Write(B", ")
             self.Write(bytes(node.name, "UTF-8"))
@@ -984,18 +861,15 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.indentLevel += 1
 
             self.IndentWrite(B"")
-            col = 0
-            for i in range(self.beginFrame, self.endFrame):
+            for i in range(self.beginFrame, self.endFrame + 1):
                 self.WriteFloat((i - self.beginFrame) * self.frameTime)
+                if i == self.endFrame:
+                    self.Write(B"\n")
+                    break
                 self.Write(B", ")
-                col += 1
-                if not col % 8:
+                if not (i - self.beginFrame) % kOutputColumns:
                     self.Write(B"\n")
                     self.IndentWrite(B"")
-                    col = 0
-
-            self.WriteFloat(self.endFrame * self.frameTime)
-            self.Write(B"\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
@@ -1061,17 +935,16 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.indentLevel += 1
 
             self.IndentWrite(B"")
-            col = 0
-            for i in range(self.beginFrame, self.endFrame):
+            for i in range(self.beginFrame, self.endFrame + 1):
                 self.WriteFloat((i - self.beginFrame) * self.frameTime)
+                if i == self.endFrame:
+                    self.Write(B"\n")
+                    break
                 self.Write(B", ")
-                col += 1
-                if not col % 8:
+                idx = i - self.beginFrame
+                if idx and not (idx + 1) % kOutputColumns:
                     self.Write(B"\n")
                     self.IndentWrite(B"")
-
-            self.WriteFloat(self.endFrame * self.frameTime)
-            self.Write(B"\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
@@ -1089,21 +962,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             parent = poseBone.parent
             if (parent):
-                for i in range(self.beginFrame, self.endFrame):
+                for i in range(self.beginFrame, self.endFrame + 1):
                     scene.frame_set(i)
                     if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
                         self.WriteMatrixFlat(parent.matrix.inverted() @ poseBone.matrix)
                     else:
                         self.WriteMatrixFlat(poseBone.matrix)
 
-                    self.Write(B",\n")
+                    if i == self.endFrame:
+                        self.Write(B"\n")
+                        break
 
-                scene.frame_set(self.endFrame)
-                if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
-                    self.WriteMatrixFlat(parent.matrix.inverted() @ poseBone.matrix)
-                else:
-                    self.WriteMatrixFlat(poseBone.matrix)
-                self.Write(B"\n")
+                    self.Write(B",\n")
 
             else:
                 for i in range(self.beginFrame, self.endFrame):
@@ -1147,18 +1017,16 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel += 1
 
         self.IndentWrite(B"")
-        col = 0
-        for i in range(self.beginFrame, self.endFrame):
+        for i in range(self.beginFrame, self.endFrame + 1):
             self.WriteFloat((i - self.beginFrame) * self.frameTime)
+            if i == self.endFrame:
+                self.Write(B"\n")
+                break
             self.Write(B", ")
-            col += 1
-            if not col % 8:
+            idx = i - self.beginFrame
+            if idx and not (idx + 1) % kOutputColumns:
                 self.Write(B"\n")
                 self.IndentWrite(B"")
-                col = 0
-
-        self.WriteFloat(self.endFrame * self.frameTime)
-        self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
@@ -1175,20 +1043,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel += 1
 
         self.IndentWrite(B"")
-        col = 0
-        for i in range(self.beginFrame, self.endFrame):
+        for i in range(self.beginFrame, self.endFrame + 1):
             scene.frame_set(i)
             self.WriteFloat(block.value)
+            if i == self.endFrame:
+                self.Write(B"\n")
+                break
             self.Write(B", ")
-            col += 1
-            if not col % 8:
+            idx = i - self.beginFrame
+            if idx and not (idx + 1) % kOutputColumns:
                 self.Write(B"\n")
                 self.IndentWrite(B"")
-                col = 0
-
-        scene.frame_set(self.endFrame)
-        self.WriteFloat(block.value)
-        self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
@@ -1747,7 +1612,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         if (nodeRef):
             self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
 
     def ExportNode(self, node, scene, poseBone = None):
         # This function exports a single node in the scene and includes its name,
@@ -1765,8 +1629,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 if (node.hide_render):
                     self.IndentWrite(B"visible: false\n")
 
-            structFlag = False
-
             # Export the node's name if it has one.
 
             name = node.name or nodeRef["structName"]
@@ -1774,7 +1636,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.IndentWrite(B"name: ")
                 self.WriteString(name)
                 self.Write(B"\n")
-                structFlag = True
 
             # Export the object reference and material references.
 
@@ -1807,8 +1668,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 if (shapeKeys):
                     self.ExportMorphWeights(node, shapeKeys, scene)
 
-                structFlag = True
-
             elif (type == kNodeTypeLight):
                 if (not object in self.lightArray):
                     self.lightArray[object] = {"structName" : bytes("light" + str(len(self.lightArray) + 1), "UTF-8"), "nodeTable" : [node]}
@@ -1818,7 +1677,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.IndentWrite(B"light: ")
                 self.WriteString(object.name)
                 self.Write(B"\n")
-                structFlag = True
 
             elif (type == kNodeTypeCamera):
                 if (not object in self.cameraArray):
@@ -1828,10 +1686,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
                 self.IndentWrite(B"camera: ")
                 self.WriteString(object.name)
-                self.Write(B"\n")
-                structFlag = True
-
-            if (structFlag):
                 self.Write(B"\n")
 
             if (poseBone):
@@ -1847,7 +1701,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.WriteMatrix(poseBone.matrix.inverted())
 
                     self.indentLevel -= 1
-                    self.Write(B"\n")
 
             # Export the transform. If the node is animated, then animation tracks are exported here.
 
@@ -1866,91 +1719,76 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         if (nodeRef):
             self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
 
     def ExportSkin(self, node, armature, exportVertexArray):
         # This function exports all skinning data, which includes the skeleton
         # and per-vertex bone influence data.
 
-        self.IndentWrite(B"Skin\n", 0, True)
-        self.IndentWrite(B"{\n")
+        self.IndentWrite(B"skin:\n")
         self.indentLevel += 1
 
         # Write the skin bind pose transform.
 
-        self.IndentWrite(B"Transform\n")
-        self.IndentWrite(B"{\n")
+        self.IndentWrite(B"transform:  # node.matrix_world (ExportSkin)\n")
         self.indentLevel += 1
 
-        self.IndentWrite(B"float[16]\n")
-        self.IndentWrite(B"{\n")
+        self.IndentWrite(B"type: \"mat4\"\n")
+        self.IndentWrite(B"data: ")
         self.WriteMatrix(node.matrix_world)
-        self.IndentWrite(B"}\n")
 
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n\n")
 
         # Export the skeleton, which includes an array of bone node references
         # and and array of per-bone bind pose transforms.
 
-        self.IndentWrite(B"Skeleton\n")
-        self.IndentWrite(B"{\n")
+        self.IndentWrite(B"skeleton:\n")
         self.indentLevel += 1
 
         # Write the bone node reference array.
 
-        self.IndentWrite(B"BoneRefArray\n")
-        self.IndentWrite(B"{\n")
-        self.indentLevel += 1
-
         boneArray = armature.data.bones
         boneCount = len(boneArray)
 
-        self.IndentWrite(B"ref\t\t\t// ")
+        self.IndentWrite(B"bones: [  # string[")
         self.WriteInt(boneCount)
-        self.IndentWrite(B"{\n", 0, True)
-        self.IndentWrite(B"", 1)
+        self.Write(B"]\n")
+        self.indentLevel += 1
 
         for i in range(boneCount):
             boneRef = self.FindNode(boneArray[i].name)
             if (boneRef):
-                self.Write(B"$")
-                self.Write(boneRef[1]["structName"])
+                self.IndentWrite(B"")
+                self.WriteString(boneArray[i].name)
             else:
+                self.IndentWrite(B"")
                 self.Write(B"null")
 
             if (i < boneCount - 1):
-                self.Write(B", ")
+                self.Write(B",\n")
             else:
                 self.Write(B"\n")
 
-        self.IndentWrite(B"}\n")
-
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n\n")
+        self.IndentWrite(B"]\n")
 
         # Write the bind pose transform array.
 
-        self.IndentWrite(B"Transform\n")
-        self.IndentWrite(B"{\n")
-        self.indentLevel += 1
-
-        self.IndentWrite(B"float[16]\t// ")
+        self.IndentWrite(B"bind_poses: [  # mat4[")
         self.WriteInt(boneCount)
-        self.IndentWrite(B"{\n", 0, True)
+        self.Write(B"]\n")
+        self.indentLevel += 1
 
         for i in range(boneCount):
             self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
             if (i < boneCount - 1):
                 self.Write(B",\n")
-
-        self.IndentWrite(B"}\n", 0, True)
-
-        self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
+            else:
+                self.Write(B"\n")
 
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n\n")
+        self.IndentWrite(B"]\n")
+
+        self.indentLevel -= 1
 
         # Export the per-vertex bone influence data.
 
@@ -1990,64 +1828,51 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         # Write the bone count array. There is one entry per vertex.
 
-        self.IndentWrite(B"BoneCountArray\n")
-        self.IndentWrite(B"{\n")
-        self.indentLevel += 1
-
-        self.IndentWrite(B"unsigned_int16\t\t// ")
+        self.IndentWrite(B"bone_count_array: [  # u16[")
         self.WriteInt(len(boneCountArray))
-        self.IndentWrite(B"{\n", 0, True)
+        self.Write(B"]\n")
+        self.indentLevel += 1
         self.WriteIntArray(boneCountArray)
-        self.IndentWrite(B"}\n")
-
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n\n")
+        self.IndentWrite(B"]\n")
 
         # Write the bone index array. The number of entries is the sum of the bone counts for all vertices.
 
-        self.IndentWrite(B"BoneIndexArray\n")
-        self.IndentWrite(B"{\n")
-        self.indentLevel += 1
-
-        self.IndentWrite(B"unsigned_int16\t\t// ")
+        self.IndentWrite(B"bone_index_array: [  # u16[")
         self.WriteInt(len(boneIndexArray))
-        self.IndentWrite(B"{\n", 0, True)
+        self.Write(B"]\n")
+        self.indentLevel += 1
         self.WriteIntArray(boneIndexArray)
-        self.IndentWrite(B"}\n")
-
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n\n")
+        self.IndentWrite(B"]\n")
 
         # Write the bone weight array. The number of entries is the sum of the bone counts for all vertices.
 
-        self.IndentWrite(B"BoneWeightArray\n")
-        self.IndentWrite(B"{\n")
-        self.indentLevel += 1
-
-        self.IndentWrite(B"float\t\t// ")
+        self.IndentWrite(B"bone_weight_array: [  # float[")
         self.WriteInt(len(boneWeightArray))
-        self.IndentWrite(B"{\n", 0, True)
+        self.Write(B"]\n")
+        self.indentLevel += 1
         self.WriteFloatArray(boneWeightArray)
-        self.IndentWrite(B"}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
 
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
-
-        self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
 
     def ExportGeometry(self, objectRef, scene):
         # This function exports a single geometry object.
 
-        self.Write(B"\nGeometryObject $")
-        self.Write(objectRef[1]["structName"])
+        self.Write(B"geometry:")
+        # NOTE(dlb): Node table is just a comment
         self.WriteNodeTable(objectRef)
-
-        self.Write(B"\n{\n")
+        self.Write(B"\n")
         self.indentLevel += 1
 
         node = objectRef[1]["nodeTable"][0]
         mesh = objectRef[0]
+
+        self.IndentWrite(B"name: ")
+        self.WriteString(node.name)
+        self.Write(B"\n")
 
         # Save the morph state if necessary.
 
@@ -2071,27 +1896,34 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                         break
                     morphCount += 1
 
+            self.IndentWrite(B"morphs: [\n")
+            self.indentLevel += 1
+
             morphCount = 0
             for block in shapeKeys.key_blocks:
                 currentMorphValue.append(block.value)
                 block.value = 0.0
 
                 if (block.name != ""):
-                    self.IndentWrite(B"Morph (index = ")
-                    self.WriteInt(morphCount)
-
-                    if ((relative) and (morphCount != baseIndex)):
-                        self.Write(B", base = ")
-                        self.WriteInt(baseIndex)
-
-                    self.Write(B")\n")
                     self.IndentWrite(B"{\n")
-                    self.IndentWrite(B"name: ", 1)
+                    self.indentLevel += 1
+
+                    self.IndentWrite(B"name: ")
                     self.WriteString(block.name)
                     self.Write(B"\n")
+
+                    if ((relative) and (morphCount != baseIndex)):
+                        self.IndentWrite(B"base: ")
+                        self.WriteInt(baseIndex)
+                        self.Write(B"\n")
+
+                    self.indentLevel -= 1
                     self.IndentWrite(B"}\n")
 
                 morphCount += 1
+
+            self.indentLevel -= 1
+            self.IndentWrite(B"]\n")
 
             shapeKeys.key_blocks[0].value = 1.0
             mesh.update()
@@ -2135,25 +1967,29 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         # Write the position array.
 
-        self.IndentWrite(B"vertex_array:  # vertex count = ")
+        self.IndentWrite(B"vertex_array:  # vec3[")
         self.WriteInt(vertexCount)
-        self.Write(B"\n")
+        self.Write(B"]\n")
         self.indentLevel += 1
         self.IndentWrite(B"attrib: \"position\"\n")
         self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
         self.WriteVertexArray3D(unifiedVertexArray, "position")
+        self.indentLevel -= 1
         self.IndentWrite(B"]\n")
         self.indentLevel -= 1
 
         # Write the normal array.
 
-        self.IndentWrite(B"vertex_array:  # vertex count = ")
+        self.IndentWrite(B"vertex_array:  # vec3[")
         self.WriteInt(vertexCount)
-        self.Write(B"\n")
+        self.Write(B"]\n")
         self.indentLevel += 1
         self.IndentWrite(B"attrib: \"normal\"\n")
         self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
         self.WriteVertexArray3D(unifiedVertexArray, "normal")
+        self.indentLevel -= 1
         self.IndentWrite(B"]\n")
         self.indentLevel -= 1
 
@@ -2161,13 +1997,15 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         colorCount = len(exportMesh.vertex_colors)
         if (colorCount > 0):
-            self.IndentWrite(B"vertex_array:  # vertex count = ")
+            self.IndentWrite(B"vertex_array:  # vec3[")
             self.WriteInt(vertexCount)
-            self.Write(B"\n")
+            self.Write(B"]\n")
             self.indentLevel += 1
             self.IndentWrite(B"attrib: \"color\"\n")
             self.IndentWrite(B"data: [\n")
+            self.indentLevel += 1
             self.WriteVertexArray3D(unifiedVertexArray, "color")
+            self.indentLevel -= 1
             self.IndentWrite(B"]\n")
             self.indentLevel -= 1
 
@@ -2175,24 +2013,28 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         texcoordCount = len(exportMesh.uv_layers)
         if (texcoordCount > 0):
-            self.IndentWrite(B"vertex_array:  # vertex count = ")
+            self.IndentWrite(B"vertex_array:  # vec2[")
             self.WriteInt(vertexCount)
-            self.Write(B"\n")
+            self.Write(B"]\n")
             self.indentLevel += 1
             self.IndentWrite(B"attrib: \"texcoord0\"\n")
             self.IndentWrite(B"data: [\n")
+            self.indentLevel += 1
             self.WriteVertexArray2D(unifiedVertexArray, "texcoord0")
+            self.indentLevel -= 1
             self.IndentWrite(B"]\n")
             self.indentLevel -= 1
 
             if (texcoordCount > 1):
-                self.IndentWrite(B"vertex_array:  # vertex count = ")
+                self.IndentWrite(B"vertex_array:  # vec2[")
                 self.WriteInt(vertexCount)
-                self.Write(B"\n")
+                self.Write(B"]\n")
                 self.indentLevel += 1
                 self.IndentWrite(B"attrib: \"texcoord1\"\n")
                 self.IndentWrite(B"data: [\n")
+                self.indentLevel += 1
                 self.WriteVertexArray2D(unifiedVertexArray, "texcoord1")
+                self.indentLevel -= 1
                 self.IndentWrite(B"]\n")
                 self.indentLevel -= 1
 
@@ -2221,37 +2063,39 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
                 # Write the morph target position array.
 
-                self.IndentWrite(B"VertexArray (attrib = \"position\", morph = ", 0, True)
-                self.WriteInt(m)
-                self.Write(B")\n")
-                self.IndentWrite(B"{\n")
-                self.indentLevel += 1
-
-                self.IndentWrite(B"float[3]\t\t// ")
+                self.IndentWrite(B"vertex_array:  # vec3[")
                 self.WriteInt(vertexCount)
-                self.IndentWrite(B"{\n", 0, True)
+                self.Write(B"]\n")
+                self.indentLevel += 1
+                self.IndentWrite(B"attrib: \"position\"\n")
+                self.IndentWrite(B"morph: ")
+                self.WriteInt(m)
+                #self.WriteString(shapeKeys.key_blocks[m].name)
+                self.Write(B"\n")
+                self.IndentWrite(B"data: [\n")
+                self.indentLevel += 1
                 self.WriteMorphPositionArray3D(unifiedVertexArray, morphMesh.vertices)
-                self.IndentWrite(B"}\n")
-
                 self.indentLevel -= 1
-                self.IndentWrite(B"}\n\n")
+                self.IndentWrite(B"]\n")
+                self.indentLevel -= 1
 
                 # Write the morph target normal array.
 
-                self.IndentWrite(B"VertexArray (attrib = \"normal\", morph = ")
-                self.WriteInt(m)
-                self.Write(B")\n")
-                self.IndentWrite(B"{\n")
-                self.indentLevel += 1
-
-                self.IndentWrite(B"float[3]\t\t// ")
+                self.IndentWrite(B"vertex_array:  # vec3[")
                 self.WriteInt(vertexCount)
-                self.IndentWrite(B"{\n", 0, True)
+                self.Write(B"]\n")
+                self.indentLevel += 1
+                self.IndentWrite(B"attrib: \"normal\"\n")
+                self.IndentWrite(B"morph: ")
+                self.WriteInt(m)
+                #self.WriteString(shapeKeys.key_blocks[m].name)
+                self.Write(B"\n")
+                self.IndentWrite(B"data: [\n")
+                self.indentLevel += 1
                 self.WriteMorphNormalArray3D(unifiedVertexArray, morphMesh.vertices, morphMesh.loop_triangles)
-                self.IndentWrite(B"}\n")
-
                 self.indentLevel -= 1
-                self.IndentWrite(B"}\n")
+                self.IndentWrite(B"]\n")
+                self.indentLevel -= 1
 
                 #bpy.data.meshes.remove(morphMesh)
                 node.to_mesh_clear()
@@ -2265,18 +2109,16 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         if (maxMaterialIndex == 0):
             # There is only one material, so write a single index array.
-            self.IndentWrite(B"IndexArray\n", 0, True)
-            self.IndentWrite(B"{\n")
-            self.indentLevel += 1
-
-            self.IndentWrite(B"unsigned_int32[3]\t\t// ")
+            self.IndentWrite(B"index_array:  # u32[")
             self.WriteInt(triangleCount)
-            self.IndentWrite(B"{\n", 0, True)
+            self.Write(B"]\n")
+            self.indentLevel += 1
+            self.IndentWrite(B"data: [\n")
+            self.indentLevel += 1
             self.WriteTriangleArray(triangleCount, indexTable)
-            self.IndentWrite(B"}\n")
-
             self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
+            self.IndentWrite(B"]\n")
+            self.indentLevel -= 1
 
         else:
             # If there are multiple material indexes, then write a separate index array for each one.
@@ -2295,20 +2137,20 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                             materialIndexTable.append(indexTable[k + 1])
                             materialIndexTable.append(indexTable[k + 2])
 
-                    self.IndentWrite(B"IndexArray (material = ", 0, True)
-                    self.WriteInt(m)
-                    self.Write(B")\n")
-                    self.IndentWrite(B"{\n")
-                    self.indentLevel += 1
-
-                    self.IndentWrite(B"unsigned_int32[3]\t\t// ")
+                    self.IndentWrite(B"index_array:  # u32[")
                     self.WriteInt(materialTriangleCount[m])
-                    self.IndentWrite(B"{\n", 0, True)
+                    self.Write(B"]\n")
+                    self.indentLevel += 1
+                    self.IndentWrite(B"material: ")
+                    self.WriteString(bpy.data.materials[m].name)
+                    #self.WriteInt(m)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"data: [\n")
+                    self.indentLevel += 1
                     self.WriteTriangleArray(materialTriangleCount[m], materialIndexTable)
-                    self.IndentWrite(B"}\n")
-
                     self.indentLevel -= 1
-                    self.IndentWrite(B"}\n")
+                    self.IndentWrite(B"]\n")
+                    self.indentLevel -= 1
 
         # If the mesh is skinned, export the skinning data here.
         if (armature):
@@ -2325,20 +2167,26 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             mesh.update()
 
         self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
-
         self.indentLevel -= 1
-        self.Write(B"}\n")
 
     def ExportLight(self, objectRef):
         # This function exports a single light object.
-        self.Write(B"\nLightObject $")
-        self.Write(objectRef[1]["structName"])
+        self.Write(B"light:")
 
         object = objectRef[0]
         type = object.type
 
-        self.Write(B" (type = ")
+        self.WriteNodeTable(objectRef)
+
+        self.Write(B"\n")
+        self.indentLevel += 1
+
+        self.IndentWrite(B"name: ")
+        self.WriteString(object.name)
+        #self.Write(objectRef[1]["structName"])
+        self.Write(B"\n")
+
+        self.IndentWrite(B"type: ")
         pointFlag = False
         spotFlag = False
 
@@ -2351,88 +2199,74 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.Write(B"\"spot\"")
             pointFlag = True
             spotFlag = True
+        self.Write(B"\n")
 
-        if (not object.use_shadow):
-            self.Write(B", shadow = false")
-
-        self.Write(B")")
-        self.WriteNodeTable(objectRef)
-
-        self.Write(B"\n{\n")
-        self.indentLevel += 1
+        if (object.use_shadow):
+            self.IndentWrite(B"shadow: true\n")
+        else:
+            self.IndentWrite(B"shadow: false\n")
 
         # Export the light's color, and include a separate intensity if necessary.
 
-        self.IndentWrite(B"Color (attrib = \"light\") {float[3] {")
+        self.IndentWrite(B"color: ")
         self.WriteColor(object.color)
-        self.Write(B"}}\n")
+        self.Write(B"\n")
 
         intensity = object.energy
+        # NOTE(dlb): Default light intensity = 1.0
         if (intensity != 1.0):
-            self.IndentWrite(B"Param (attrib = \"intensity\") {float {")
+            self.IndentWrite(B"intensity: ")
             self.WriteFloat(intensity)
-            self.Write(B"}}\n")
+            self.Write(B"\n")
 
         if (pointFlag):
             # Export a separate attenuation function for each type that's in use.
             falloff = object.falloff_type
 
             if (falloff == "INVERSE_LINEAR"):
-                self.IndentWrite(B"Atten (curve = \"inverse\")\n", 0, True)
-                self.IndentWrite(B"{\n")
-
-                self.IndentWrite(B"Param (attrib = \"scale\") {float {", 1)
+                self.IndentWrite(B"atten:\n")
+                self.IndentWrite(B"kind: \"distance\"\n", 1)
+                self.IndentWrite(B"curve: \"inverse\"\n", 1)
+                self.IndentWrite(B"scale: ", 1)
                 self.WriteFloat(object.distance)
-                self.Write(B"}}\n")
-
-                self.IndentWrite(B"}\n")
+                self.Write(B"\n")
 
             elif (falloff == "INVERSE_SQUARE"):
-                self.IndentWrite(B"Atten (curve = \"inverse_square\")\n", 0, True)
-                self.IndentWrite(B"{\n")
-
-                self.IndentWrite(B"Param (attrib = \"scale\") {float {", 1)
+                self.IndentWrite(B"atten:\n")
+                self.IndentWrite(B"kind: \"distance\"\n", 1)
+                self.IndentWrite(B"curve: \"inverse_square\"\n", 1)
+                self.IndentWrite(B"scale: ", 1)
                 self.WriteFloat(math.sqrt(object.distance))
-                self.Write(B"}}\n")
-
-                self.IndentWrite(B"}\n")
+                self.Write(B"\n")
 
             elif (falloff == "LINEAR_QUADRATIC_WEIGHTED"):
                 if (object.linear_attenuation != 0.0):
-                    self.IndentWrite(B"Atten (curve = \"inverse\")\n", 0, True)
-                    self.IndentWrite(B"{\n")
-
-                    self.IndentWrite(B"Param (attrib = \"scale\") {float {", 1)
+                    self.IndentWrite(B"atten:\n")
+                    self.IndentWrite(B"kind: \"distance\"\n", 1)
+                    self.IndentWrite(B"curve: \"inverse\"\n", 1)
+                    self.IndentWrite(B"scale: ", 1)
                     self.WriteFloat(object.distance)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"Param (attrib = \"constant\") {float {", 1)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"constant: ", 1)
                     self.WriteFloat(1.0)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"Param (attrib = \"linear\") {float {", 1)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"linear: ", 1)
                     self.WriteFloat(object.linear_attenuation)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"}\n\n")
+                    self.Write(B"\n")
 
                 if (object.quadratic_attenuation != 0.0):
-                    self.IndentWrite(B"Atten (curve = \"inverse_square\")\n")
-                    self.IndentWrite(B"{\n")
-
-                    self.IndentWrite(B"Param (attrib = \"scale\") {float {", 1)
+                    self.IndentWrite(B"atten:\n")
+                    self.IndentWrite(B"kind: \"distance\"\n", 1)
+                    self.IndentWrite(B"curve: \"inverse_square\"\n", 1)
+                    self.IndentWrite(B"scale: ", 1)
                     self.WriteFloat(object.distance)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"Param (attrib = \"constant\") {float {", 1)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"constant: ", 1)
                     self.WriteFloat(1.0)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"Param (attrib = \"quadratic\") {float {", 1)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"quadratic: ", 1)
                     self.WriteFloat(object.quadratic_attenuation)
-                    self.Write(B"}}\n")
-
-                    self.IndentWrite(B"}\n")
+                    self.Write(B"\n")
 
             # if (object.use_sphere):
             #     self.IndentWrite(B"Atten (curve = \"linear\")\n", 0, True)
@@ -2448,50 +2282,46 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
                 # Export additional angular attenuation for spot lights.
 
-                self.IndentWrite(B"Atten (kind = \"angle\", curve = \"linear\")\n", 0, True)
-                self.IndentWrite(B"{\n")
+                self.IndentWrite(B"atten:\n")
+                self.IndentWrite(B"kind: \"angle\"\n", 1)
+                self.IndentWrite(B"curve: \"linear\"\n", 1)
 
                 endAngle = object.spot_size * 0.5
                 beginAngle = endAngle * (1.0 - object.spot_blend)
 
-                self.IndentWrite(B"Param (attrib = \"begin\") {float {", 1)
+                self.IndentWrite(B"begin: ", 1)
                 self.WriteFloat(beginAngle)
-                self.Write(B"}}\n")
-
-                self.IndentWrite(B"Param (attrib = \"end\") {float {", 1)
+                self.Write(B"\n")
+                self.IndentWrite(B"end: ", 1)
                 self.WriteFloat(endAngle)
-                self.Write(B"}}\n")
-
-                self.IndentWrite(B"}\n")
+                self.Write(B"\n")
 
         self.indentLevel -= 1
-        self.Write(B"}\n")
 
     def ExportCamera(self, objectRef):
         # This function exports a single camera object.
-        self.Write(B"\nCameraObject $")
-        self.Write(objectRef[1]["structName"])
+        self.Write(B"camera:")
         self.WriteNodeTable(objectRef)
 
-        self.Write(B"\n{\n")
+        self.Write(B"\n")
         self.indentLevel += 1
 
         object = objectRef[0]
 
-        self.IndentWrite(B"Param (attrib = \"fov\") {float {")
+        self.IndentWrite(B"name: ")
+        self.WriteString(object.name)
+        self.Write(B"\n")
+        self.IndentWrite(B"fov: ")
         self.WriteFloat(object.angle_x)
-        self.Write(B"}}\n")
-
-        self.IndentWrite(B"Param (attrib = \"near\") {float {")
+        self.Write(B"\n")
+        self.IndentWrite(B"near: ")
         self.WriteFloat(object.clip_start)
-        self.Write(B"}}\n")
-
-        self.IndentWrite(B"Param (attrib = \"far\") {float {")
+        self.Write(B"\n")
+        self.IndentWrite(B"far: ")
         self.WriteFloat(object.clip_end)
-        self.Write(B"}}\n")
+        self.Write(B"\n")
 
         self.indentLevel -= 1
-        self.Write(B"}\n")
 
     def ExportObjects(self, scene):
         for objectRef in self.geometryArray.items():
