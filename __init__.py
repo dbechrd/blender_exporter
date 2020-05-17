@@ -55,7 +55,7 @@ kAnimationBezier = 2
 
 kExportEpsilon = 1.0e-6
 
-structIdentifier = [B"ta_node", B"ta_bone_node", B"ta_geometry_node", B"ta_light_node", B"ta_camera_node"]
+structIdentifier = [B"node", B"bone_node", B"geometry_node", B"light_node", B"camera_node"]
 
 subtranslationName = [B"xpos", B"ypos", B"zpos"]
 subrotationName = [B"xrot", B"yrot", B"zrot"]
@@ -151,6 +151,8 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
     def WriteFloat(self, f):
         if ((math.isinf(f)) or (math.isnan(f))):
             self.file.write(B"0.0")
+        elif (f == 0):
+            self.file.write(B"0")
         else:
             as_int = struct.unpack('<I', struct.pack('<f', f))[0]
             #as_hex = hex(as_int)                  # As hex string "0x2f"
@@ -1679,6 +1681,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.indentLevel += 1
 
                 for i in range(len(node.material_slots)):
+                    material = node.material_slots[i].material
+                    self.materialArray[material] = {"structName" : bytes("material" + str(len(self.materialArray) + 1), "UTF-8")}
+
                     self.IndentWrite(B"")
                     self.WriteString(node.material_slots[i].material.name)
                     if i < len(node.material_slots) - 1:
@@ -2405,7 +2410,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             f.write(texture.data())
 
         # This function exports a single texture from a material.
-        self.IndentWrite(B"ta_texture: {\n")
+        self.IndentWrite(B"texture: {\n")
         self.indentLevel += 1
 
         self.IndentWrite(B"name: ")
@@ -2506,54 +2511,66 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             #     return True
 
-            self.IndentWrite(B"ta_material: {", 0, True)
+            self.IndentWrite(B"material: {\n")
             self.indentLevel += 1
 
             # TODO(dlb): Get rid of refs and ensure name is never None
-            self.IndentWrite(B"name: ", 0, True)
+            self.IndentWrite(B"name: ")
             self.WriteString(material.name or materialRef[1]["structName"])
+            self.Write(B"\n")
 
             ogex_base = os.path.basename(self.filepath)
             # TODO(dlb): Export factors if textures don't exist? Or both? Mix? Something?
             # TODO(dlb): Pack channels during export?
             if (alpha_factor):
-                self.IndentWrite(B"alpha_factor: ", 0, True)
+                self.IndentWrite(B"alpha_factor: ")
                 self.WriteFloat(alpha_factor)
+                self.Write(B"\n")
             if (alpha_texture):
-                self.IndentWrite(B"alpha_texture: ", 0, True)
+                self.IndentWrite(B"alpha_texture: ")
                 self.WriteFileName(alpha_texture.filename(ogex_base))
+                self.Write(B"\n")
             if (albedo_factor):
-                self.IndentWrite(B"albedo_factor: ", 0, True)
+                self.IndentWrite(B"albedo_factor: ")
                 self.WriteColor(albedo_factor)
+                self.Write(B"\n")
             if (albedo_texture):
-                self.IndentWrite(B"albedo_texture: ", 0, True)
+                self.IndentWrite(B"albedo_texture: ")
                 self.WriteFileName(albedo_texture.filename(ogex_base))
+                self.Write(B"\n")
             if (emissive_factor):
-                self.IndentWrite(B"emissive_factor: ", 0, True)
+                self.IndentWrite(B"emissive_factor: ")
                 self.WriteColor(emissive_factor)
+                self.Write(B"\n")
             if (emissive_texture):
-                self.IndentWrite(B"emissive_texture: ", 0, True)
+                self.IndentWrite(B"emissive_texture: ")
                 self.WriteFileName(emissive_texture.filename(ogex_base))
+                self.Write(B"\n")
             if (metallic_factor):
-                self.IndentWrite(B"metallic_factor: ", 0, True)
+                self.IndentWrite(B"metallic_factor: ")
                 self.WriteFloat(metallic_factor)
+                self.Write(B"\n")
             if (metallic_texture):
-                self.IndentWrite(B"metallic_texture: ", 0, True)
+                self.IndentWrite(B"metallic_texture: ")
                 self.WriteFileName(metallic_texture.filename(ogex_base))
+                self.Write(B"\n")
             if (normal_factor):
-                self.IndentWrite(B"normal_factor: ", 0, True)
+                self.IndentWrite(B"normal_factor: ")
                 self.WriteVector3D(normal_factor)
+                self.Write(B"\n")
             if (normal_texture):
-                self.IndentWrite(B"normal_texture: ", 0, True)
+                self.IndentWrite(B"normal_texture: ")
                 self.WriteFileName(normal_texture.filename(ogex_base))
+                self.Write(B"\n")
             if (roughness_factor):
-                self.IndentWrite(B"roughness_factor: ", 0, True)
+                self.IndentWrite(B"roughness_factor: ")
                 self.WriteFloat(roughness_factor)
+                self.Write(B"\n")
             if (roughness_texture):
-                self.IndentWrite(B"roughness_texture: ", 0, True)
+                self.IndentWrite(B"roughness_texture: ")
                 self.WriteFileName(roughness_texture.filename(ogex_base))
+                self.Write(B"\n")
 
-            self.Write(B"\n")
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
