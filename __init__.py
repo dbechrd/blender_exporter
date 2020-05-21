@@ -155,8 +155,8 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.file.write(B"0")
         else:
             as_int = struct.unpack('<I', struct.pack('<f', f))[0]
-            #as_hex = hex(as_int)                  # As hex string "0x2f"
-            as_pad = "{0:#010x}".format(as_int)  # As hex string padded with 0s "0x2f000000"
+            #as_hex = hex(as_int)                 # As hex string "0x2f"
+            as_pad = "{0:#010x}".format(as_int)   # As hex string padded with 0s "0x2f000000"
             #as_str = str(f)                      # As string "3.5"
             self.file.write(bytes(as_pad, "UTF-8"))
 
@@ -708,7 +708,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         return (curveArray)
 
     def ExportKeyTimes(self, fcurve):
-        self.IndentWrite(B"Key {float {")
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"value\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         keyCount = len(fcurve.keyframe_points)
         for i in range(keyCount):
@@ -718,10 +723,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             time = fcurve.keyframe_points[i].co[0] - self.beginFrame
             self.WriteFloat(time * self.frameTime)
 
-        self.Write(B"}}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
 
     def ExportKeyTimeControlPoints(self, fcurve):
-        self.IndentWrite(B"Key (kind = \"-control\") {float {")
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"-control\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         keyCount = len(fcurve.keyframe_points)
         for i in range(keyCount):
@@ -731,8 +744,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             ctrl = fcurve.keyframe_points[i].handle_left[0] - self.beginFrame
             self.WriteFloat(ctrl * self.frameTime)
 
-        self.Write(B"}}\n")
-        self.IndentWrite(B"Key (kind = \"+control\") {float {")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
+
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"+control\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         for i in range(keyCount):
             if (i > 0):
@@ -741,10 +763,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             ctrl = fcurve.keyframe_points[i].handle_right[0] - self.beginFrame
             self.WriteFloat(ctrl * self.frameTime)
 
-        self.Write(B"}}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
 
     def ExportKeyValues(self, fcurve):
-        self.IndentWrite(B"Key {float {")
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"value\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         keyCount = len(fcurve.keyframe_points)
         for i in range(keyCount):
@@ -754,10 +784,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             value = fcurve.keyframe_points[i].co[1]
             self.WriteFloat(value)
 
-        self.Write(B"}}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
 
     def ExportKeyValueControlPoints(self, fcurve):
-        self.IndentWrite(B"Key (kind = \"-control\") {float {")
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"-control\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         keyCount = len(fcurve.keyframe_points)
         for i in range(keyCount):
@@ -767,8 +805,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             ctrl = fcurve.keyframe_points[i].handle_left[1]
             self.WriteFloat(ctrl)
 
-        self.Write(B"}}\n")
-        self.IndentWrite(B"Key (kind = \"+control\") {float {")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
+
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"+control\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
 
         for i in range(keyCount):
             if (i > 0):
@@ -777,7 +824,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             ctrl = fcurve.keyframe_points[i].handle_right[1]
             self.WriteFloat(ctrl)
 
-        self.Write(B"}}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
 
     def ExportAnimationTrack(self, fcurve, kind, target, target_index, newline):
 
@@ -798,41 +848,31 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         if (kind != kAnimationBezier):
             self.IndentWrite(B"time: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"curve: \"linear\"\n")
             self.ExportKeyTimes(fcurve)
-
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
+
             self.IndentWrite(B"value: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"curve: \"linear\"\n")
             self.ExportKeyValues(fcurve)
-
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
         else:
             self.IndentWrite(B"time: {\n")
             self.indentLevel += 1
-
-            self.IndentWrite(B"curve: ")
-            self.WriteString("bezier")
-            self.Write(B"\n")
-
+            self.IndentWrite(B"curve: \"bezier\"\n")
             self.ExportKeyTimes(fcurve)
             self.ExportKeyTimeControlPoints(fcurve)
-
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
+
             self.IndentWrite(B"value: {\n")
             self.indentLevel += 1
-
-            self.IndentWrite(B"curve: ")
-            self.WriteString("bezier")
-            self.Write(B"\n")
-
+            self.IndentWrite(B"curve: \"bezier\"\n")
             self.ExportKeyValues(fcurve)
             self.ExportKeyValueControlPoints(fcurve)
-
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
@@ -865,8 +905,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.IndentWrite(B"time: {\n")
             self.indentLevel += 1
-
-            self.IndentWrite(B"key: [\n")
+            self.IndentWrite(B"curve: \"linear\"\n")
+            self.IndentWrite(B"key: {\n")
+            self.indentLevel += 1
+            self.IndentWrite(B"kind: \"value\"\n")
+            self.IndentWrite(B"type: \"float\"\n")
+            self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
 
             self.IndentWrite(B"")
@@ -882,14 +926,18 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
+            self.indentLevel -= 1
+            self.IndentWrite(B"}\n")
+            self.indentLevel -= 1
+            self.IndentWrite(B"}\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"value: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"curve: \"linear\"\n")
             self.IndentWrite(B"key: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"kind: \"value\"\n")
             self.IndentWrite(B"type: \"mat4\"\n")
             self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
@@ -908,8 +956,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.IndentWrite(B"}\n")
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
+
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
+
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
@@ -943,8 +993,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.IndentWrite(B"time: {\n")
             self.indentLevel += 1
-
-            self.IndentWrite(B"key: [\n")
+            self.IndentWrite(B"curve: \"linear\"\n")
+            self.IndentWrite(B"key: {\n")
+            self.indentLevel += 1
+            self.IndentWrite(B"kind: \"value\"\n")
+            self.IndentWrite(B"type: \"float\"\n")
+            self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
 
             self.IndentWrite(B"")
@@ -961,15 +1015,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
-
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
+            self.indentLevel -= 1
+            self.IndentWrite(B"}\n")
+
             self.IndentWrite(B"value: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"curve: \"linear\"\n")
             self.IndentWrite(B"key: {\n")
             self.indentLevel += 1
-
+            self.IndentWrite(B"kind: \"value\"\n")
             self.IndentWrite(B"type: \"mat4\"\n")
             self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
@@ -1001,13 +1057,14 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
+            self.indentLevel -= 1
+            self.IndentWrite(B"}\n")
+            self.indentLevel -= 1
+            self.IndentWrite(B"}\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
-            self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
-            self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
+
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
@@ -1030,8 +1087,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         self.IndentWrite(B"time: {\n")
         self.indentLevel += 1
-
-        self.IndentWrite(B"key: [\n")
+        self.IndentWrite(B"curve: \"linear\"\n")
+        self.IndentWrite(B"key: {\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"kind: \"value\"\n")
+        self.IndentWrite(B"type: \"float\"\n")
+        self.IndentWrite(B"data: [\n")
         self.indentLevel += 1
 
         self.IndentWrite(B"")
@@ -1048,15 +1109,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
-
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
+
         self.IndentWrite(B"value: {\n")
         self.indentLevel += 1
-
+        self.IndentWrite(B"curve: \"linear\"\n")
         self.IndentWrite(B"key: {\n")
         self.indentLevel += 1
-
+        self.IndentWrite(B"kind: \"value\"\n")
         self.IndentWrite(B"type: \"float\"\n")
         self.IndentWrite(B"data: [\n")
         self.indentLevel += 1
@@ -1076,11 +1139,11 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
 
-        self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
-        self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
 
@@ -2644,6 +2707,8 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.exportAllFlag = not self.option_export_selection
         self.sampleAnimationFlag = self.option_sample_animation
 
+        self.Write(B"{\n")
+
         print("Processing nodes")
         for object in scene.objects:
             if (not object.parent):
@@ -2663,10 +2728,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         print("Exporting materials")
         self.ExportMaterials()
 
+        self.Write(B"}\n")
+        self.file.close()
+
         if (self.restoreFrame):
             scene.frame_set(originalFrame, subframe=originalSubframe)
 
-        self.file.close()
         print("Finished")
         return {'FINISHED'}
 
