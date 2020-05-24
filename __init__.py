@@ -3251,7 +3251,7 @@ def get_tex_from_socket(socket: bpy.types.NodeSocket):
 def gather_alpha_factor(blender_material):
     alpha_socket = get_material_socket(blender_material, "Alpha")
     if alpha_socket and not alpha_socket.is_linked:
-        alpha_socket.default_value
+        return alpha_socket.default_value
     return None
 
 def gather_alpha_texture(blender_material):
