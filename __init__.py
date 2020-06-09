@@ -66,7 +66,7 @@ deltaSubscaleName = [B"dxscl", B"dyscl", B"dzscl"]
 axisName = [B"x", B"y", B"z"]
 
 class ExportVertex:
-    __slots__ = ("hash", "vertexIndex", "faceIndex", "position", "normal", "color", "texcoord0", "texcoord1")
+    __slots__ = ("hash", "vertexIndex", "faceIndex", "position", "normal", "tangent", "color", "texcoord0", "texcoord1")
 
     def __init__(self):
         self.color = [1.0, 1.0, 1.0]
@@ -79,6 +79,8 @@ class ExportVertex:
         if (self.position != v.position):
             return (False)
         if (self.normal != v.normal):
+            return (False)
+        if (self.tangent != v.tangent):
             return (False)
         if (self.color != v.color):
             return (False)
@@ -97,6 +99,9 @@ class ExportVertex:
     #        self.normal[0],
     #        self.normal[1],
     #        self.normal[2],
+    #        self.tangent[0],
+    #        self.tangent[1],
+    #        self.tangent[2],
     #        self.color[0],
     #        self.color[1],
     #        self.color[2],
@@ -113,6 +118,9 @@ class ExportVertex:
         h = h * 21737 + hash(self.normal[0])
         h = h * 21737 + hash(self.normal[1])
         h = h * 21737 + hash(self.normal[2])
+        h = h * 21737 + hash(self.tangent[0])
+        h = h * 21737 + hash(self.tangent[1])
+        h = h * 21737 + hash(self.tangent[2])
         h = h * 21737 + hash(self.color[0])
         h = h * 21737 + hash(self.color[1])
         h = h * 21737 + hash(self.color[2])
@@ -454,8 +462,13 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         exportVertexArray = []
         faceIndex = 0
 
-        for face in mesh.loop_triangles:
+        for face in mesh.polygons:
             assert(len(face.vertices) == 3)
+
+            # Need to get tangents from loops, but position/normals from vertices??
+            l1 = mesh.loops[face.loop_indices[0]]
+            l2 = mesh.loops[face.loop_indices[1]]
+            l3 = mesh.loops[face.loop_indices[2]]
 
             k1 = face.vertices[0]
             k2 = face.vertices[1]
@@ -470,6 +483,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             exportVertex.faceIndex = faceIndex
             exportVertex.position = v1.co
             exportVertex.normal = v1.normal if (face.use_smooth) else face.normal
+            exportVertex.tangent = l1.tangent
             exportVertexArray.append(exportVertex)
 
             exportVertex = ExportVertex()
@@ -477,6 +491,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             exportVertex.faceIndex = faceIndex
             exportVertex.position = v2.co
             exportVertex.normal = v2.normal if (face.use_smooth) else face.normal
+            exportVertex.tangent = l2.tangent
             exportVertexArray.append(exportVertex)
 
             exportVertex = ExportVertex()
@@ -484,6 +499,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             exportVertex.faceIndex = faceIndex
             exportVertex.position = v3.co
             exportVertex.normal = v3.normal if (face.use_smooth) else face.normal
+            exportVertex.tangent = l3.tangent
             exportVertexArray.append(exportVertex)
 
             materialTable.append(face.material_index)
@@ -516,25 +532,13 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         texcoordCount = len(mesh.uv_layers)
         if (texcoordCount > 0):
             vertexIndex = 0
-            for uv_layer in mesh.uv_layers:
-                for tri in mesh.loop_triangles:
-                    exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[0].data[0].uv
+            for tri in mesh.loop_triangles:
+                assert(len(tri.loops) == 3)
+                for loop_index in tri.loops:
+                    exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[0].data[loop_index].uv
+                    if (texcoordCount > 1):
+                        exportVertexArray[vertexIndex].texcoord1 = mesh.uv_layers[1].data[loop_index].uv
                     vertexIndex += 1
-                    exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[0].data[1].uv
-                    vertexIndex += 1
-                    exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[0].data[2].uv
-                    vertexIndex += 1
-
-            if (texcoordCount > 1):
-                vertexIndex = 0
-                for uv_layer in mesh.uv_layers:
-                    for tri in mesh.loop_triangles:
-                        exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[1].data[0].uv
-                        vertexIndex += 1
-                        exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[1].data[1].uv
-                        vertexIndex += 1
-                        exportVertexArray[vertexIndex].texcoord0 = mesh.uv_layers[1].data[2].uv
-                        vertexIndex += 1
 
         for ev in exportVertexArray:
             ev.Hash()
@@ -2054,6 +2058,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             exportMesh = node.original.to_mesh()
         print(f"Exporting mesh with {len(mesh.vertices)} vertices at {node.matrix_world}")
         exportMesh.calc_loop_triangles()
+        exportMesh.calc_tangents()
 
         # Triangulate mesh and remap vertices to eliminate duplicates.
 
@@ -2090,6 +2095,21 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.IndentWrite(B"data: [\n")
         self.indentLevel += 1
         self.WriteVertexArray3D(unifiedVertexArray, "normal")
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+        self.indentLevel -= 1
+        self.IndentWrite(B"}\n")
+
+         # Write the tangent array.
+
+        self.IndentWrite(B"vertex_array: {  # vec3[")
+        self.WriteInt(vertexCount)
+        self.Write(B"]\n")
+        self.indentLevel += 1
+        self.IndentWrite(B"attrib: \"tangent\"\n")
+        self.IndentWrite(B"data: [\n")
+        self.indentLevel += 1
+        self.WriteVertexArray3D(unifiedVertexArray, "tangent")
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
         self.indentLevel -= 1
