@@ -817,8 +817,22 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         return (False)
 
+    # @staticmethod
+    # def CollectBoneAnimation(armature, name):
+    #     path = "pose.bones[\"" + name + "\"]."
+    #     curveArray = []
+
+    #     if (armature.animation_data):
+    #         action = armature.animation_data.action
+    #         if (action):
+    #             for fcurve in action.fcurves:
+    #                 if (fcurve.data_path.startswith(path)):
+    #                     curveArray.append(fcurve)
+
+    #     return (curveArray)
+
     @staticmethod
-    def CollectBoneAnimation(armature, name):
+    def HasBoneAnimation(armature, name):
         path = "pose.bones[\"" + name + "\"]."
         curveArray = []
 
@@ -827,9 +841,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             if (action):
                 for fcurve in action.fcurves:
                     if (fcurve.data_path.startswith(path)):
-                        curveArray.append(fcurve)
+                        return True
+            nla_tracks = armature.animation_data.nla_tracks
+            for track in nla_tracks:
+                for strip in track.strips:
+                    action = strip.action
+                    if (action):
+                        for fcurve in action.fcurves:
+                            if (fcurve.data_path.startswith(path)):
+                                return True
 
-        return (curveArray)
+        return False
 
     def ExportKeyTimes(self, fcurve):
         self.IndentWrite(B"key: {\n")
@@ -1107,7 +1129,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 break
 
         if (animationFlag):
-            self.IndentWrite(B"animation: {  # BoneSampledAnimation\n", 0, True)
+            self.IndentWrite(B"animation: {  # BoneSampledAnimation\n")
             self.indentLevel += 1
 
             self.IndentWrite(B"track: {\n")
@@ -1373,12 +1395,16 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             # If there's no keyframe animation at all, then write the node transform as a single 4x4 matrix.
             # We might still be exporting sampled animation below.
 
-            self.IndentWrite(B"transform: {  # node.matrix_local (ExportNodeTransform)\n")
+            self.IndentWrite(B"transform: {  # ExportNodeTransform\n")
             self.indentLevel += 1
 
-            self.IndentWrite(B"type: \"mat4\"\n")
-            self.IndentWrite(B"data: ")
-            self.WriteMatrix(node.matrix_local)
+            self.IndentWrite(B"position: ")
+            self.WriteVector3D(node.location)
+            self.Write(B"\n")
+            self.IndentWrite(B"orientation: ")
+            self.WriteQuaternion(node.rotation_quaternion)
+            #self.WriteQuaternion(node.matrix_local.to_quaternion())
+            self.Write(B"\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
@@ -1685,13 +1711,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.IndentWrite(B"}\n")
 
     def ExportBoneTransform(self, armature, bone, scene):
-        curveArray = self.CollectBoneAnimation(armature, bone.name)
-        animation = ((len(curveArray) != 0) or (self.sampleAnimationFlag))
-
-        transform = bone.matrix_local.copy()
-        parentBone = bone.parent
-        if ((parentBone) and (math.fabs(parentBone.matrix_local.determinant()) > kExportEpsilon)):
-            transform = parentBone.matrix_local.inverted() @ transform
+        #curveArray = self.CollectBoneAnimation(armature, bone.name)
+        #animation = ((len(curveArray) != 0) or (self.sampleAnimationFlag))
+        hasCurves = self.HasBoneAnimation(armature, bone.name)
+        animation = (hasCurves or (self.sampleAnimationFlag))
 
         poseBone = armature.pose.bones.get(bone.name)
         if (poseBone):
@@ -1699,13 +1722,21 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             parentPoseBone = poseBone.parent
             if ((parentPoseBone) and (math.fabs(parentPoseBone.matrix.determinant()) > kExportEpsilon)):
                 transform = parentPoseBone.matrix.inverted() @ transform
+        else:
+            transform = bone.matrix_local.copy()
+            parentBone = bone.parent
+            if ((parentBone) and (math.fabs(parentBone.matrix_local.determinant()) > kExportEpsilon)):
+                transform = parentBone.matrix_local.inverted() @ transform
 
-        self.IndentWrite(B"transform: {  # bone.matrix_local without parentBone/parentPoseBone (ExportBoneTransform)\n")
+        self.IndentWrite(B"transform: {  # ExportBoneTransform\n")
         self.indentLevel += 1
 
-        self.IndentWrite(B"type: \"mat4\"\n")
-        self.IndentWrite(B"data: ")
-        self.WriteMatrix(transform)
+        self.IndentWrite(B"position: ")
+        self.WriteVector3D(transform.translation)
+        self.Write(B"\n")
+        self.IndentWrite(B"orientation: ")
+        self.WriteQuaternion(transform.to_quaternion())
+        self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
@@ -1912,9 +1943,13 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.IndentWrite(B"transform: {  # poseBone.matrix.inverted() (ExportNode)\n")
                     self.indentLevel += 1
 
-                    self.IndentWrite(B"type: \"mat4\"\n")
-                    self.IndentWrite(B"data: ")
-                    self.WriteMatrix(poseBone.matrix.inverted())
+                    transform = poseBone.matrix.inverted()
+                    self.IndentWrite(B"position: ")
+                    self.WriteVector3D(transform.translation)
+                    self.Write(B"\n")
+                    self.IndentWrite(B"orientation: ")
+                    self.WriteQuaternion(transform.to_quaternion())
+                    self.Write(B"\n")
 
                     self.indentLevel -= 1
                     self.IndentWrite(B"}\n")
@@ -1950,9 +1985,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.IndentWrite(B"transform: {  # node.matrix_world (ExportSkin)\n")
         self.indentLevel += 1
 
-        self.IndentWrite(B"type: \"mat4\"\n")
-        self.IndentWrite(B"data: ")
-        self.WriteMatrix(node.matrix_world)
+        self.IndentWrite(B"position: ")
+        self.WriteVector3D(node.matrix_world.translation)
+        self.Write(B"\n")
+        self.IndentWrite(B"orientation: ")
+        self.WriteQuaternion(node.matrix_world.to_quaternion())
+        self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
@@ -1990,19 +2028,46 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
 
-        # Write the bind pose transform array.
+        self.IndentWrite(B"bind_poses: [\n")
+        self.indentLevel += 1
 
-        self.IndentWrite(B"bind_poses: [  # mat4[")
+        # Write the bind pose location array.
+
+        self.IndentWrite(B"positions: [  # vec3[")
         self.WriteInt(boneCount)
         self.Write(B"]\n")
         self.indentLevel += 1
 
         for i in range(boneCount):
-            self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
+            self.IndentWrite(B"")
+            #self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
+            self.WriteVector3D(armature.location + boneArray[i].head_local)
             if (i < boneCount - 1):
                 self.Write(B",\n")
             else:
                 self.Write(B"\n")
+
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
+
+        # Write the bone pose rotation array.
+
+        self.IndentWrite(B"orientations: [  # quat[")
+        self.WriteInt(boneCount)
+        self.Write(B"]\n")
+        self.indentLevel += 1
+
+        for i in range(boneCount):
+            self.IndentWrite(B"")
+            #self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
+            self.WriteQuaternion(armature.rotation_quaternion @ boneArray[i].matrix_local.to_quaternion())
+            if (i < boneCount - 1):
+                self.Write(B",\n")
+            else:
+                self.Write(B"\n")
+
+        self.indentLevel -= 1
+        self.IndentWrite(B"]\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
@@ -2632,17 +2697,19 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         voffset = 0.0 #textureSlot.offset[1]
 
         if ((uscale != 1.0) or (vscale != 1.0) or (uoffset != 0.0) or (voffset != 0.0)):
-            matrix = [[uscale, 0.0, 0.0, 0.0], [0.0, vscale, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [uoffset, voffset, 0.0, 1.0]]
-
-            self.IndentWrite(B"transform: {\n", 0, True)
-            self.indentLevel += 1
-
-            self.IndentWrite(B"type: \"mat4\"\n")
-            self.IndentWrite(B"data: ")
-            self.WriteMatrix(matrix)
-
-            self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
+            #matrix = [[uscale, 0.0, 0.0, 0.0], [0.0, vscale, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [uoffset, voffset, 0.0, 1.0]]
+            self.IndentWrite(B"uscale: ")
+            self.WriteFloat(uscale)
+            self.Write(B"\n")
+            self.IndentWrite(B"vscale: ")
+            self.WriteFloat(vscale)
+            self.Write(B"\n")
+            self.IndentWrite(B"uoffset: ")
+            self.WriteFloat(uoffset)
+            self.Write(B"\n")
+            self.IndentWrite(B"voffset: ")
+            self.WriteFloat(voffset)
+            self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
