@@ -2413,55 +2413,36 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             if (index > maxMaterialIndex):
                 maxMaterialIndex = index
 
-        if (maxMaterialIndex == 0):
-            # There is only one material, so write a single index array.
-            self.IndentWrite(B"index_array: {  # u32[")
-            self.WriteInt(triangleCount)
-            self.Write(B"]\n")
-            self.indentLevel += 1
-            self.IndentWrite(B"material: ")
-            self.WriteString(bpy.data.materials[0].name)
-            self.Write(B"\n")
-            self.IndentWrite(B"data: [\n")
-            self.indentLevel += 1
-            self.WriteTriangleArray(triangleCount, indexTable)
-            self.indentLevel -= 1
-            self.IndentWrite(B"]\n")
-            self.indentLevel -= 1
-            self.IndentWrite(B"}\n")
+        # If there are multiple material indexes, then write a separate index array for each one.
+        materialTriangleCount = [0 for i in range(maxMaterialIndex + 1)]
+        for i in range(len(materialTable)):
+            materialTriangleCount[materialTable[i]] += 1
 
-        else:
-            # If there are multiple material indexes, then write a separate index array for each one.
+        for m in range(maxMaterialIndex + 1):
+            if (materialTriangleCount[m] != 0):
+                materialIndexTable = []
+                for i in range(len(materialTable)):
+                    if (materialTable[i] == m):
+                        k = i * 3
+                        materialIndexTable.append(indexTable[k])
+                        materialIndexTable.append(indexTable[k + 1])
+                        materialIndexTable.append(indexTable[k + 2])
 
-            materialTriangleCount = [0 for i in range(maxMaterialIndex + 1)]
-            for i in range(len(materialTable)):
-                materialTriangleCount[materialTable[i]] += 1
-
-            for m in range(maxMaterialIndex + 1):
-                if (materialTriangleCount[m] != 0):
-                    materialIndexTable = []
-                    for i in range(len(materialTable)):
-                        if (materialTable[i] == m):
-                            k = i * 3
-                            materialIndexTable.append(indexTable[k])
-                            materialIndexTable.append(indexTable[k + 1])
-                            materialIndexTable.append(indexTable[k + 2])
-
-                    self.IndentWrite(B"index_array: {  # u32[")
-                    self.WriteInt(materialTriangleCount[m])
-                    self.Write(B"]\n")
-                    self.indentLevel += 1
-                    self.IndentWrite(B"material: ")
-                    self.WriteString(bpy.data.materials[m].name)
-                    #self.WriteInt(m)
-                    self.Write(B"\n")
-                    self.IndentWrite(B"data: [\n")
-                    self.indentLevel += 1
-                    self.WriteTriangleArray(materialTriangleCount[m], materialIndexTable)
-                    self.indentLevel -= 1
-                    self.IndentWrite(B"]\n")
-                    self.indentLevel -= 1
-                    self.IndentWrite(B"}\n")
+                self.IndentWrite(B"index_array: {  # u32[")
+                self.WriteInt(materialTriangleCount[m])
+                self.Write(B"]\n")
+                self.indentLevel += 1
+                self.IndentWrite(B"material_slot: ")
+                #self.WriteString(bpy.data.materials[m].name)
+                self.WriteInt(m)
+                self.Write(B"\n")
+                self.IndentWrite(B"data: [\n")
+                self.indentLevel += 1
+                self.WriteTriangleArray(materialTriangleCount[m], materialIndexTable)
+                self.indentLevel -= 1
+                self.IndentWrite(B"]\n")
+                self.indentLevel -= 1
+                self.IndentWrite(B"}\n")
 
         # If the mesh is skinned, export the skinning data here.
         if (armature):
