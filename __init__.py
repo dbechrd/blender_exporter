@@ -2028,12 +2028,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
 
-        self.IndentWrite(B"bind_poses: [\n")
-        self.indentLevel += 1
-
         # Write the bind pose location array.
 
-        self.IndentWrite(B"positions: [  # vec3[")
+        self.IndentWrite(B"bind_pose_positions: [  # vec3[")
         self.WriteInt(boneCount)
         self.Write(B"]\n")
         self.indentLevel += 1
@@ -2052,7 +2049,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         # Write the bone pose rotation array.
 
-        self.IndentWrite(B"orientations: [  # quat[")
+        self.IndentWrite(B"bind_pose_orientations: [  # quat[")
         self.WriteInt(boneCount)
         self.Write(B"]\n")
         self.indentLevel += 1
@@ -2065,9 +2062,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B",\n")
             else:
                 self.Write(B"\n")
-
-        self.indentLevel -= 1
-        self.IndentWrite(B"]\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
@@ -2425,6 +2419,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.WriteInt(triangleCount)
             self.Write(B"]\n")
             self.indentLevel += 1
+            self.IndentWrite(B"material: ")
+            self.WriteString(bpy.data.materials[0].name)
+            self.Write(B"\n")
             self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
             self.WriteTriangleArray(triangleCount, indexTable)
