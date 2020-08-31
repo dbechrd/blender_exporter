@@ -158,11 +158,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
     def WriteFloat(self, f):
         if ((math.isinf(f)) or (math.isnan(f))):
+            # TODO: Should this silently convert to 0, or throw an error? I don't like silent errors.
             self.file.write(B"0.0")
         elif (abs(f) < kExportEpsilon):
             self.file.write(B"0")
         else:
-            #as_str = str(round(f, 8))                      # As string "3.5"
+            #as_str = str(round(f, 8))            # As string "3.5"
             as_int = struct.unpack('<I', struct.pack('<f', f))[0]
             as_pad = "{0:#010x}".format(as_int)  # As hex string padded with 0s "0x2f000000"
             #as_hex = hex(as_int)                 # As hex string "0x2f"
@@ -833,41 +834,39 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         return (False)
 
+    @staticmethod
+    def CollectBoneActions(boneName):
+        path = "pose.bones[\"" + boneName + "\"]."
+        actions = []
+
+        for action in bpy.data.actions:
+            for fcurve in action.fcurves:
+                if (fcurve.data_path.startswith(path)):
+                    actions.append(action.name)
+                    break
+
+        return (actions)
+
     # @staticmethod
-    # def CollectBoneAnimation(armature, name):
+    # def HasBoneAnimation(armature, name):
     #     path = "pose.bones[\"" + name + "\"]."
-    #     curveArray = []
 
     #     if (armature.animation_data):
     #         action = armature.animation_data.action
     #         if (action):
     #             for fcurve in action.fcurves:
     #                 if (fcurve.data_path.startswith(path)):
-    #                     curveArray.append(fcurve)
+    #                     return True
+    #         nla_tracks = armature.animation_data.nla_tracks
+    #         for track in nla_tracks:
+    #             for strip in track.strips:
+    #                 action = strip.action
+    #                 if (action):
+    #                     for fcurve in action.fcurves:
+    #                         if (fcurve.data_path.startswith(path)):
+    #                             return True
 
-    #     return (curveArray)
-
-    @staticmethod
-    def HasBoneAnimation(armature, name):
-        path = "pose.bones[\"" + name + "\"]."
-        curveArray = []
-
-        if (armature.animation_data):
-            action = armature.animation_data.action
-            if (action):
-                for fcurve in action.fcurves:
-                    if (fcurve.data_path.startswith(path)):
-                        return True
-            nla_tracks = armature.animation_data.nla_tracks
-            for track in nla_tracks:
-                for strip in track.strips:
-                    action = strip.action
-                    if (action):
-                        for fcurve in action.fcurves:
-                            if (fcurve.data_path.startswith(path)):
-                                return True
-
-        return False
+    #     return False
 
     def ExportKeyTimes(self, fcurve):
         self.IndentWrite(B"key: {\n")
@@ -1234,7 +1233,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
     #     scene.frame_set(currentFrame, subframe=currentSubframe)
 
-    def ExportBoneSampledAnimationTranslation(self, poseBone, scene):
+    def ExportBoneSampledAnimationTranslation(self, poseBone, action, scene):
 
         # This function exports bone animation translation as vec3 for each frame.
 
@@ -1254,6 +1253,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         if (animationFlag):
             self.IndentWrite(B"animation: {  # ExportBoneSampledAnimationTranslation\n")
             self.indentLevel += 1
+
+            self.IndentWrite(B"clip: ")
+            self.WriteString(action)
+            self.Write(B"\n")
 
             self.IndentWrite(B"track: {\n")
             self.indentLevel += 1
@@ -1343,7 +1346,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         scene.frame_set(currentFrame, subframe=currentSubframe)
 
-    def ExportBoneSampledAnimationRotation(self, poseBone, scene):
+    def ExportBoneSampledAnimationRotation(self, poseBone, action, scene):
 
         # This function exports bone animation translation as vec4 (quaternion) for each frame.
 
@@ -1363,6 +1366,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         if (animationFlag):
             self.IndentWrite(B"animation: {  # ExportBoneSampledAnimationRotation\n")
             self.indentLevel += 1
+
+            self.IndentWrite(B"clip: ")
+            self.WriteString(action)
+            self.Write(B"\n")
 
             self.IndentWrite(B"track: {\n")
             self.indentLevel += 1
@@ -1904,48 +1911,43 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             if (positionAnimated):
                 for i in range(3):
                     if (posAnimated[i]):
-                        self.ExportAnimationTrack(posAnimCurve[i], posAnimKind[i], subtranslationName[i], structFlag)
+                        self.ExportAnimationTrack(posAnimCurve[i], posAnimKind[i], subtranslationName[i], 0, structFlag)
                         structFlag = True
 
             if (rotationAnimated):
                 for i in range(3):
                     if (rotAnimated[i]):
-                        self.ExportAnimationTrack(rotAnimCurve[i], rotAnimKind[i], subrotationName[i], structFlag)
+                        self.ExportAnimationTrack(rotAnimCurve[i], rotAnimKind[i], subrotationName[i], 0, structFlag)
                         structFlag = True
 
             if (scaleAnimated):
                 for i in range(3):
                     if (sclAnimated[i]):
-                        self.ExportAnimationTrack(sclAnimCurve[i], sclAnimKind[i], subscaleName[i], structFlag)
+                        self.ExportAnimationTrack(sclAnimCurve[i], sclAnimKind[i], subscaleName[i], 0, structFlag)
                         structFlag = True
 
             if (deltaPositionAnimated):
                 for i in range(3):
                     if (deltaPosAnimated[i]):
-                        self.ExportAnimationTrack(deltaPosAnimCurve[i], deltaPosAnimKind[i], deltaSubtranslationName[i], structFlag)
+                        self.ExportAnimationTrack(deltaPosAnimCurve[i], deltaPosAnimKind[i], deltaSubtranslationName[i], 0, structFlag)
                         structFlag = True
 
             if (deltaRotationAnimated):
                 for i in range(3):
                     if (deltaRotAnimated[i]):
-                        self.ExportAnimationTrack(deltaRotAnimCurve[i], deltaRotAnimKind[i], deltaSubrotationName[i], structFlag)
+                        self.ExportAnimationTrack(deltaRotAnimCurve[i], deltaRotAnimKind[i], deltaSubrotationName[i], 0, structFlag)
                         structFlag = True
 
             if (deltaScaleAnimated):
                 for i in range(3):
                     if (deltaSclAnimated[i]):
-                        self.ExportAnimationTrack(deltaSclAnimCurve[i], deltaSclAnimKind[i], deltaSubscaleName[i], structFlag)
+                        self.ExportAnimationTrack(deltaSclAnimCurve[i], deltaSclAnimKind[i], deltaSubscaleName[i], 0, structFlag)
                         structFlag = True
 
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
     def ExportBoneTransform(self, armature, bone, scene):
-        #curveArray = self.CollectBoneAnimation(armature, bone.name)
-        #animation = ((len(curveArray) != 0) or (self.sampleAnimationFlag))
-        hasCurves = self.HasBoneAnimation(armature, bone.name)
-        animation = (hasCurves or (self.sampleAnimationFlag))
-
         poseBone = armature.pose.bones.get(bone.name)
         if (poseBone):
             transform = poseBone.matrix.copy()
@@ -1973,9 +1975,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.WriteQuaternion(transform.to_quaternion())
         self.Write(B"\n")
 
-        if ((animation) and (poseBone)):
-            self.ExportBoneSampledAnimationTranslation(poseBone, scene)
-            self.ExportBoneSampledAnimationRotation(poseBone, scene)
+        if (poseBone):
+            actions = self.CollectBoneActions(bone.name)
+            for action in actions:
+                armature.animation_data.action = bpy.data.actions.get(action)
+                self.ExportBoneSampledAnimationTranslation(poseBone, action, scene)
+                self.ExportBoneSampledAnimationRotation(poseBone, action, scene)
 
     def ExportMorphWeights(self, node, shapeKeys, scene):
         action = None
