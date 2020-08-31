@@ -1129,7 +1129,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 break
 
         if (animationFlag):
-            self.IndentWrite(B"animation: {  # BoneSampledAnimation\n")
+            self.IndentWrite(B"animation: {  # ExportBoneSampledAnimation\n")
             self.indentLevel += 1
 
             self.IndentWrite(B"track: {\n")
@@ -1728,14 +1728,26 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             if ((parentBone) and (math.fabs(parentBone.matrix_local.determinant()) > kExportEpsilon)):
                 transform = parentBone.matrix_local.inverted() @ transform
 
-        self.IndentWrite(B"transform: {  # ExportBoneTransform\n")
+        self.IndentWrite(B"transform: {  # ExportBoneTransform (poseBone = ")
+        if (poseBone):
+            self.Write(B"true")
+        else:
+            self.Write(B"false")
+        self.Write(B")\n")
         self.indentLevel += 1
 
+        pos = transform.translation
+        rot = transform.to_quaternion()
+
+        # convert from bone coordinate system to Blender world space coordinate system
+        #pos = [pos.x, -pos.z, pos.y]
+        #rot = [rot.w, rot.x, -rot.z, rot.y]
+
         self.IndentWrite(B"position: ")
-        self.WriteVector3D(transform.translation)
+        self.WriteVector3D(pos)
         self.Write(B"\n")
         self.IndentWrite(B"orientation: ")
-        self.WriteQuaternion(transform.to_quaternion())
+        self.WriteQuaternion(rot)
         self.Write(B"\n")
 
         self.indentLevel -= 1
@@ -2860,7 +2872,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         #| any node structure, the array of bind-pose transforms stored in a
         #| Skeleton structure, and the bind-pose transform stored in a Skin
         #| structure.
-        self.Write(B"#Metric (key = \"up\") {string {\"z\"}}\n")
+        self.Write(B"#Metric (key = \"up\") {string {\"y\"}}\n")
 
     def execute(self, context):
         print("\n#--------------------------------------------------")
@@ -3758,8 +3770,7 @@ def gather_image_data(socket: bpy.types.NodeSocket) -> ExportImage:
         return None
 
     if tex.shader_node.image.channels == 0:
-        gltf2_io_debug.print_console("WARNING",
-            f"Image '{tex.shader_node.image}' has no color channels and cannot be exported.")
+        print_console("WARNING", f"Image '{tex.shader_node.image}' has no color channels and cannot be exported.")
         return None
 
     # rudimentarily try follow the node tree to find the correct image data.
