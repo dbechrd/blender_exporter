@@ -515,6 +515,60 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
                 self.IndentWrite(B"")
 
+    def WriteMorphTangentArray3D(self, vertexArray, mesh, meshVertexArray, tessFaceArray):
+        count = len(vertexArray)
+
+        self.IndentWrite(B"")
+        for i in range(count):
+            self.WriteVector3D(mesh.loops[vertexArray[i].vertexIndex].tangent)
+            if i == count - 1:
+                self.Write(B"\n")
+                break
+            self.Write(B", ")
+            if not (i + 1) % kOutputColumns:
+                self.Write(B"\n")
+                self.IndentWrite(B"")
+
+        # vertexArray = mesh.vertices
+        # exportVertexArray = []
+        # faceIndex = 0
+
+        # for face in mesh.polygons:
+        #     assert(len(face.vertices) == 3)
+
+        #     # Need to get tangents from loops, but position/normals from vertices??
+        #     l1 = mesh.loops[face.loop_indices[0]]
+        #     l2 = mesh.loops[face.loop_indices[1]]
+        #     l3 = mesh.loops[face.loop_indices[2]]
+
+        #     k1 = face.vertices[0]
+        #     k2 = face.vertices[1]
+        #     k3 = face.vertices[2]
+
+        #     v1 = vertexArray[k1]
+        #     v2 = vertexArray[k2]
+        #     v3 = vertexArray[k3]
+
+        #     exportVertex = ExportVertex()
+        #     exportVertex.vertexIndex = k1
+        #     exportVertex.faceIndex = faceIndex
+        #     exportVertex.tangent = l1.tangent
+        #     exportVertexArray.append(exportVertex)
+
+        #     exportVertex = ExportVertex()
+        #     exportVertex.vertexIndex = k2
+        #     exportVertex.faceIndex = faceIndex
+        #     exportVertex.tangent = l2.tangent
+        #     exportVertexArray.append(exportVertex)
+
+        #     exportVertex = ExportVertex()
+        #     exportVertex.vertexIndex = k3
+        #     exportVertex.faceIndex = faceIndex
+        #     exportVertex.tangent = l3.tangent
+        #     exportVertexArray.append(exportVertex)
+
+        #     faceIndex += 1
+
     def WriteTriangle(self, triangleIndex, indexTable):
         i = triangleIndex * 3
         self.WriteInt(indexTable[i])
@@ -2028,8 +2082,25 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.IndentWrite(B"")
             self.WriteFloat(block.value if (block.name != referenceName) else 1.0)
             if k < len(shapeKeys.key_blocks) - 1:
-                self.Write(B", ")
+                self.Write(B",")
             self.Write(B"\n")
+
+        # NOTE(dlb): If the indices of the geometry_node.morph_weights array do not *always* implicitly
+        # match those of the geometry.morphs array, then we would need to write explicit index like so:
+
+        # for k in range(len(shapeKeys.key_blocks)):
+        #     block = shapeKeys.key_blocks[k]
+        #     self.IndentWrite(B"{\n")
+        #     self.indentLevel += 1
+        #     self.IndentWrite(B"morph_target_index: ")
+        #     self.WriteInt(k)
+        #     self.IndentWrite(B"value: ")
+        #     self.WriteFloat(block.value if (block.name != referenceName) else 1.0)
+        #     self.indentLevel -= 1
+        #     self.IndentWrite(B"}\n")
+        #     if k < len(shapeKeys.key_blocks) - 1:
+        #         self.Write(B",")
+        #     self.Write(B"\n")
 
         self.indentLevel -= 1
         self.IndentWrite(B"]\n")
@@ -2377,7 +2448,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
     def ExportGeometry(self, objectRef, scene):
         # This function exports a single geometry object.
 
-        self.Write(B"geometry: {")
+        self.Write(B"mesh: {")
         # NOTE(dlb): Node table is just a comment
         self.WriteNodeTable(objectRef)
         self.Write(B"\n")
@@ -2412,7 +2483,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                         break
                     morphCount += 1
 
-            self.IndentWrite(B"morphs: [\n")
+            self.IndentWrite(B"morph_targets: [\n")
             self.indentLevel += 1
 
             morphCount = len(shapeKeys.key_blocks)
@@ -2431,7 +2502,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.Write(B"\n")
 
                     if ((relative) and (morphCount != baseIndex)):
-                        self.IndentWrite(B"base: ")
+                        self.IndentWrite(B"base_morph_target_index: ")
                         self.WriteInt(baseIndex)
                         self.Write(B"\n")
 
@@ -2446,9 +2517,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             shapeKeys.key_blocks[0].value = 1.0
             mesh.update()
-
-        self.IndentWrite(B"mesh: {\n")
-        self.indentLevel += 1
 
         armature = node.find_armature()
         applyModifiers = (not armature)
@@ -2600,6 +2668,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 else:
                     morphMesh = node.original.to_mesh()
                 morphMesh.calc_loop_triangles()
+                morphMesh.calc_tangents()
 
                 # Write the morph target position array.
 
@@ -2608,8 +2677,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"]\n")
                 self.indentLevel += 1
                 self.IndentWrite(B"attrib: \"position\"\n")
-                self.IndentWrite(B"morph: ")
+                self.IndentWrite(B"morph_index: ")
                 self.WriteInt(m)
+                #self.WriteString(B"  # ")
                 #self.WriteString(shapeKeys.key_blocks[m].name)
                 self.Write(B"\n")
                 self.IndentWrite(B"data: [\n")
@@ -2627,8 +2697,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"]\n")
                 self.indentLevel += 1
                 self.IndentWrite(B"attrib: \"normal\"\n")
-                self.IndentWrite(B"morph: ")
+                self.IndentWrite(B"morph_index: ")
                 self.WriteInt(m)
+                #self.WriteString(B"  # ")
                 #self.WriteString(shapeKeys.key_blocks[m].name)
                 self.Write(B"\n")
                 self.IndentWrite(B"data: [\n")
@@ -2639,8 +2710,31 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.indentLevel -= 1
                 self.IndentWrite(B"}\n")
 
+                # Write the morph target tangent array.
+
+                self.IndentWrite(B"vertex_array: {  # vec3[")
+                self.WriteInt(vertexCount)
+                self.Write(B"]\n")
+                self.indentLevel += 1
+                self.IndentWrite(B"attrib: \"tangent\"\n")
+                self.IndentWrite(B"morph_index: ")
+                self.WriteInt(m)
+                #self.WriteString(B"  # ")
+                #self.WriteString(shapeKeys.key_blocks[m].name)
+                self.Write(B"\n")
+                self.IndentWrite(B"data: [\n")
+                self.indentLevel += 1
+                self.WriteMorphTangentArray3D(unifiedVertexArray, morphMesh, morphMesh.vertices, morphMesh.loop_triangles)
+                self.indentLevel -= 1
+                self.IndentWrite(B"]\n")
+                self.indentLevel -= 1
+                self.IndentWrite(B"}\n")
+
                 #bpy.data.meshes.remove(morphMesh)
                 node.to_mesh_clear()
+
+        #self.IndentWrite(B"index_arrays: [\n")
+        #self.indentLevel += 1
 
         # Write the index arrays.
         maxMaterialIndex = 0
@@ -2665,7 +2759,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                         materialIndexTable.append(indexTable[k + 2])
 
                 self.IndentWrite(B"index_array: {  # u32[")
-                self.WriteInt(materialTriangleCount[m])
+                self.WriteInt(materialTriangleCount[m] * 3)
                 self.Write(B"]\n")
                 self.indentLevel += 1
                 self.IndentWrite(B"material_slot: ")
@@ -2679,6 +2773,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.IndentWrite(B"]\n")
                 self.indentLevel -= 1
                 self.IndentWrite(B"}\n")
+
+        #self.indentLevel -= 1
+        #self.IndentWrite(B"]\n")
 
         # If the mesh is skinned, export the skinning data here.
         if (armature):
@@ -2694,8 +2791,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             mesh.update()
 
-        self.indentLevel -= 1
-        self.IndentWrite(B"}\n")
         self.indentLevel -= 1
         self.IndentWrite(B"}\n")
 
