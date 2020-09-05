@@ -37,6 +37,7 @@ import struct
 import tempfile
 import time
 import typing
+import mathutils
 from typing import Optional
 from bpy_extras.io_utils import ExportHelper
 
@@ -64,6 +65,15 @@ deltaSubtranslationName = [B"dxpos", B"dypos", B"dzpos"]
 deltaSubrotationName = [B"dxrot", B"dyrot", B"dzrot"]
 deltaSubscaleName = [B"dxscl", B"dyscl", B"dzscl"]
 axisName = [B"x", B"y", B"z"]
+
+# Blender uses a different space for bones (+X right, +Y up, +Z forward)
+worldToBoneSpace = mathutils.Matrix([
+    [1, 0, 0, 0],
+    [0, 0, 1, 0],
+    [0, -1, 0, 0],
+    [0, 0, 0, 1]
+])
+boneToWorldSpace = worldToBoneSpace.inverted()
 
 class ExportVertex:
     __slots__ = ("hash", "vertexIndex", "faceIndex", "position", "normal", "tangent", "color", "texcoord0", "texcoord1")
@@ -163,11 +173,11 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         elif (abs(f) < kExportEpsilon):
             self.file.write(B"0")
         else:
-            #as_str = str(round(f, 8))            # As string "3.5"
-            as_int = struct.unpack('<I', struct.pack('<f', f))[0]
-            as_pad = "{0:#010x}".format(as_int)  # As hex string padded with 0s "0x2f000000"
-            #as_hex = hex(as_int)                 # As hex string "0x2f"
-            self.file.write(bytes(as_pad, "UTF-8"))
+            as_str = str(round(f, 8))            # As string "3.5"
+            #as_int = struct.unpack('<I', struct.pack('<f', f))[0]
+            #as_hex = "{0:#010x}".format(as_int)  # As hex string padded with 0s "0x2f000000"
+            #as_hex_short = hex(as_int)                 # As hex string "0x2f"
+            self.file.write(bytes(as_str, "UTF-8"))
 
     #| matrices:    11  13 -12  14
     #|              31  33 -32  34
@@ -1295,7 +1305,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         currentSubframe = scene.frame_subframe
 
         animationFlag = False
-        v1 = poseBone.matrix.translation
+        v1 = poseBone.matrix.translation.copy()
 
         for i in range(self.beginFrame, self.endFrame):
             scene.frame_set(i)
@@ -1592,7 +1602,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
         scene.frame_set(currentFrame, subframe=currentSubframe)
 
-    def ExportNodeTransform(self, node, scene):
+    def ExportNodeTransform(self, node, scene, poseBone):
         posAnimCurve = [None, None, None]
         rotAnimCurve = [None, None, None]
         sclAnimCurve = [None, None, None]
@@ -1691,13 +1701,27 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             self.IndentWrite(B"# ExportNodeTransform\n")
 
+            # Node transform, relative to parent, in world space
+            transform = node.matrix_local
+
+            # If the node is parented to a bone and is not relative, then undo the bone's transform.
+            if (poseBone and math.fabs(poseBone.matrix.determinant()) > kExportEpsilon):
+                # Bone transform, relative to parent, in world space
+                transform = poseBone.bone.matrix_local @ transform
+
+            pos = transform.translation
+            rot = transform.to_quaternion()
+
+            # if (poseBone):
+            #     pos = (pos.x, -pos.z, pos.y)
+            #     rot = (rot.w, rot.x, -rot.z, rot.y)
+
             self.IndentWrite(B"translation: ")
-            self.WriteVector3D(node.location)
+            self.WriteVector3D(pos)
             self.Write(B"\n")
 
             self.IndentWrite(B"rotation: ")
-            self.WriteQuaternion(node.rotation_quaternion)
-            #self.WriteQuaternion(node.matrix_local.to_quaternion())
+            self.WriteQuaternion(rot)
             self.Write(B"\n")
 
             if (sampledAnimation):
@@ -2001,13 +2025,53 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
+    # def ExportBoneTransform(self, armature, bone, scene):
+    #     poseBone = armature.pose.bones.get(bone.name)
+    #     if (poseBone):
+    #         transform = poseBone.matrix.copy()
+    #         parentPoseBone = poseBone.parent
+    #         if ((parentPoseBone) and (math.fabs(parentPoseBone.matrix.determinant()) > kExportEpsilon)):
+    #             transform = parentPoseBone.matrix.inverted() @ transform
+    #     else:
+    #         transform = bone.matrix_local.copy()
+    #         parentBone = bone.parent
+    #         if ((parentBone) and (math.fabs(parentBone.matrix_local.determinant()) > kExportEpsilon)):
+    #             transform = parentBone.matrix_local.inverted() @ transform
+
+    #     self.IndentWrite(B"# ExportBoneTransform (poseBone = ")
+    #     if (poseBone):
+    #         self.Write(B"true")
+    #     else:
+    #         self.Write(B"false")
+    #     self.Write(B")\n")
+
+    #     self.IndentWrite(B"translation: ")
+    #     self.WriteVector3D(transform.translation)
+    #     self.Write(B"\n")
+
+    #     self.IndentWrite(B"rotation: ")
+    #     self.WriteQuaternion(transform.to_quaternion())
+    #     self.Write(B"\n")
+
+    #     if (poseBone):
+    #         actions = self.CollectBoneActions(bone.name)
+    #         for action in actions:
+    #             armature.animation_data.action = bpy.data.actions.get(action)
+    #             self.ExportBoneSampledAnimationTranslation(poseBone, action, scene)
+    #             self.ExportBoneSampledAnimationRotation(poseBone, action, scene)
+
     def ExportBoneTransform(self, armature, bone, scene):
         poseBone = armature.pose.bones.get(bone.name)
         if (poseBone):
-            transform = poseBone.matrix.copy()
+            transform = worldToBoneSpace @ poseBone.matrix.copy()
+            #transform2 = bone.matrix_local @ poseBone.matrix_basis
+            #transform2 = poseBone.matrix.copy()
             parentPoseBone = poseBone.parent
             if ((parentPoseBone) and (math.fabs(parentPoseBone.matrix.determinant()) > kExportEpsilon)):
-                transform = parentPoseBone.matrix.inverted() @ transform
+                parentTransform = worldToBoneSpace @ parentPoseBone.matrix
+                transform = parentTransform.inverted() @ transform
+                #parentTransform2 = parentPoseBone.bone.matrix_local @ parentPoseBone.matrix_basis
+                #transform2 = parentTransform2.inverted() @ transform2
         else:
             transform = bone.matrix_local.copy()
             parentBone = bone.parent
@@ -2021,12 +2085,26 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.Write(B"false")
         self.Write(B")\n")
 
+        pos = transform.translation
+        rot = transform.to_quaternion()
+        pos = (pos.x, -pos.z, pos.y)
+        rot = (rot.w, rot.x, -rot.z, rot.y)
+
+        #pos2 = transform2.translation
+        #rot2 = transform2.to_quaternion()
+        #pos2 = (pos2.x, -pos2.z, pos2.y)
+        #rot2 = (rot2.w, rot2.x, -rot2.z, rot2.y)
+
         self.IndentWrite(B"translation: ")
-        self.WriteVector3D(transform.translation)
+        self.WriteVector3D(pos)
+        #self.Write(B"  # ")
+        #self.WriteVector3D(pos2)
         self.Write(B"\n")
 
         self.IndentWrite(B"rotation: ")
-        self.WriteQuaternion(transform.to_quaternion())
+        self.WriteQuaternion(rot)
+        #self.Write(B"  # ")
+        #self.WriteQuaternion(rot2)
         self.Write(B"\n")
 
         if (poseBone):
@@ -2244,24 +2322,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.WriteString(object.name)
                 self.Write(B"\n")
 
-            if (poseBone):
-
-                # If the node is parented to a bone and is not relative, then undo the bone's transform.
-
-                if (math.fabs(poseBone.matrix.determinant()) > kExportEpsilon):
-                    self.IndentWrite(B"# ExportNode (poseBone.matrix.inverted())\n")
-
-                    transform = poseBone.matrix.inverted()
-                    self.IndentWrite(B"translation: ")
-                    self.WriteVector3D(transform.translation)
-                    self.Write(B"\n")
-                    self.IndentWrite(B"rotation: ")
-                    self.WriteQuaternion(transform.to_quaternion())
-                    self.Write(B"\n")
-
             # Export the transform. If the node is animated, then animation tracks are exported here.
 
-            self.ExportNodeTransform(node, scene)
+            self.ExportNodeTransform(node, scene, poseBone)
 
             if (node.type == "ARMATURE"):
                 skeleton = node.data
@@ -2458,7 +2521,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         mesh = objectRef[0]
 
         self.IndentWrite(B"name: ")
-        self.WriteString(node.name)
+        self.WriteString(mesh.name)
         self.Write(B"\n")
 
         # Save the morph state if necessary.
@@ -2676,12 +2739,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.WriteInt(vertexCount)
                 self.Write(B"]\n")
                 self.indentLevel += 1
-                self.IndentWrite(B"attrib: \"position\"\n")
                 self.IndentWrite(B"morph_index: ")
                 self.WriteInt(m)
                 #self.WriteString(B"  # ")
                 #self.WriteString(shapeKeys.key_blocks[m].name)
                 self.Write(B"\n")
+                self.IndentWrite(B"attrib: \"position\"\n")
                 self.IndentWrite(B"data: [\n")
                 self.indentLevel += 1
                 self.WriteMorphPositionArray3D(unifiedVertexArray, morphMesh.vertices)
@@ -2696,12 +2759,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.WriteInt(vertexCount)
                 self.Write(B"]\n")
                 self.indentLevel += 1
-                self.IndentWrite(B"attrib: \"normal\"\n")
                 self.IndentWrite(B"morph_index: ")
                 self.WriteInt(m)
                 #self.WriteString(B"  # ")
                 #self.WriteString(shapeKeys.key_blocks[m].name)
                 self.Write(B"\n")
+                self.IndentWrite(B"attrib: \"normal\"\n")
                 self.IndentWrite(B"data: [\n")
                 self.indentLevel += 1
                 self.WriteMorphNormalArray3D(unifiedVertexArray, morphMesh.vertices, morphMesh.loop_triangles)
@@ -2716,12 +2779,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.WriteInt(vertexCount)
                 self.Write(B"]\n")
                 self.indentLevel += 1
-                self.IndentWrite(B"attrib: \"tangent\"\n")
                 self.IndentWrite(B"morph_index: ")
                 self.WriteInt(m)
                 #self.WriteString(B"  # ")
                 #self.WriteString(shapeKeys.key_blocks[m].name)
                 self.Write(B"\n")
+                self.IndentWrite(B"attrib: \"tangent\"\n")
                 self.IndentWrite(B"data: [\n")
                 self.indentLevel += 1
                 self.WriteMorphTangentArray3D(unifiedVertexArray, morphMesh, morphMesh.vertices, morphMesh.loop_triangles)
