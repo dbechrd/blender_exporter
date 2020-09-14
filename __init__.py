@@ -74,6 +74,12 @@ worldToBoneSpace = mathutils.Matrix([
     [0, 0, 0, 1]
 ])
 boneToWorldSpace = worldToBoneSpace.inverted()
+fixNodeMatrixLocal = mathutils.Matrix([
+    [1, 0, 0, 0],
+    [0, 0, -1, 0],
+    [0, 1, 0, 0],
+    [0, 0, 0, 1]
+])
 
 class ExportVertex:
     __slots__ = ("hash", "vertexIndex", "faceIndex", "position", "normal", "tangent", "color", "texcoord0", "texcoord1")
@@ -420,6 +426,15 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
     #     self.WriteFloat(vector[2])
     #     self.Write(B"]")
 
+    def WriteBoneVector3D(self, vector):
+        self.Write(B"[")
+        self.WriteFloat(vector[0])
+        self.Write(B", ")
+        self.WriteFloat(vector[1])
+        self.Write(B", ")
+        self.WriteFloat(vector[2])
+        self.Write(B"]")
+
     #| vectors:     x z -y
     # angle, x, y, z
     def WriteAxisAngle(self, vector):
@@ -453,6 +468,17 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.WriteFloat(quaternion[3])
         self.Write(B", ")
         self.WriteFloat(-quaternion[2])
+        self.Write(B", ")
+        self.WriteFloat(quaternion[0])
+        self.Write(B"]")
+
+    def WriteBoneQuaternion(self, quaternion):
+        self.Write(B"[")
+        self.WriteFloat(quaternion[1])
+        self.Write(B", ")
+        self.WriteFloat(quaternion[2])
+        self.Write(B", ")
+        self.WriteFloat(quaternion[3])
         self.Write(B", ")
         self.WriteFloat(quaternion[0])
         self.Write(B"]")
@@ -1372,10 +1398,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     scene.frame_set(i)
                     if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
                         self.IndentWrite(B"")
-                        self.WriteVector3D((parent.matrix.inverted() @ poseBone.matrix).translation)
+                        self.WriteBoneVector3D((parent.matrix.inverted() @ poseBone.matrix).translation)
                     else:
                         self.IndentWrite(B"")
-                        self.WriteVector3D(poseBone.matrix.translation)
+                        self.WriteBoneVector3D(poseBone.matrix.translation)
 
                     if i == self.endFrame:
                         self.Write(B"\n")
@@ -1387,12 +1413,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 for i in range(self.beginFrame, self.endFrame):
                     scene.frame_set(i)
                     self.IndentWrite(B"")
-                    self.WriteVector3D(poseBone.matrix.translation)
+                    self.WriteBoneVector3D(poseBone.matrix.translation)
                     self.Write(B",\n")
 
                 scene.frame_set(self.endFrame)
                 self.IndentWrite(B"")
-                self.WriteVector3D(poseBone.matrix.translation)
+                self.WriteBoneVector3D(poseBone.matrix.translation)
                 self.Write(B"\n")
 
             self.indentLevel -= 1
@@ -1485,10 +1511,10 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     scene.frame_set(i)
                     if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
                         self.IndentWrite(B"")
-                        self.WriteQuaternion((parent.matrix.inverted() @ poseBone.matrix).to_quaternion())
+                        self.WriteBoneQuaternion((parent.matrix.inverted() @ poseBone.matrix).to_quaternion())
                     else:
                         self.IndentWrite(B"")
-                        self.WriteQuaternion(poseBone.matrix.to_quaternion())
+                        self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
 
                     if i == self.endFrame:
                         self.Write(B"\n")
@@ -1500,12 +1526,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 for i in range(self.beginFrame, self.endFrame):
                     scene.frame_set(i)
                     self.IndentWrite(B"")
-                    self.WriteQuaternion(poseBone.matrix.to_quaternion())
+                    self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
                     self.Write(B",\n")
 
                 scene.frame_set(self.endFrame)
                 self.IndentWrite(B"")
-                self.WriteQuaternion(poseBone.matrix.to_quaternion())
+                self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
                 self.Write(B"\n")
 
             self.indentLevel -= 1
@@ -1698,29 +1724,34 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         deltaScaleAnimated = deltaSclAnimated[0] | deltaSclAnimated[1] | deltaSclAnimated[2]
 
         if ((sampledAnimation) or ((not positionAnimated) and (not rotationAnimated) and (not scaleAnimated) and (not deltaPositionAnimated) and (not deltaRotationAnimated) and (not deltaScaleAnimated))):
+            self.IndentWrite(B"# ExportNodeTransform (poseBone = ")
+            if (poseBone):
+                self.Write(B"true")
+            else:
+                self.Write(B"false")
+            self.Write(B")\n")
 
-            self.IndentWrite(B"# ExportNodeTransform\n")
-
-            # Node transform, relative to parent, in world space
+            # Node transform, relative to parent OBJECT (this means the armature, not the bone!), in world space
             transform = node.matrix_local
 
-            # If the node is parented to a bone and is not relative, then undo the bone's transform.
-            if (poseBone and math.fabs(poseBone.matrix.determinant()) > kExportEpsilon):
-                # Bone transform, relative to parent, in world space
-                transform = poseBone.bone.matrix_local @ transform
+            ## If the node is parented to a bone and is not relative, then undo the bone's transform.
+            #if (poseBone and math.fabs(poseBone.matrix.determinant()) > kExportEpsilon):
+            #    # Bone transform, relative to parent, in world space
+            #    transform = poseBone.matrix.inverted() @ node.matrix_basis
+            if (poseBone and math.fabs(poseBone.bone.matrix_local.determinant()) > kExportEpsilon):
+                transform = poseBone.bone.matrix_local.inverted() @ (node.matrix_parent_inverse.inverted() @ node.matrix_local)
+                transform = boneToWorldSpace @ transform
+                #transform = poseBone.bone.matrix_local.inverted() @ node.matrix_local
 
             pos = transform.translation
             rot = transform.to_quaternion()
-
-            # if (poseBone):
-            #     pos = (pos.x, -pos.z, pos.y)
-            #     rot = (rot.w, rot.x, -rot.z, rot.y)
 
             self.IndentWrite(B"translation: ")
             self.WriteVector3D(pos)
             self.Write(B"\n")
 
             self.IndentWrite(B"rotation: ")
+            #self.WriteBoneQuaternion(rot)
             self.WriteQuaternion(rot)
             self.Write(B"\n")
 
