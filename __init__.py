@@ -1505,34 +1505,45 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.IndentWrite(B"data: [\n")
             self.indentLevel += 1
 
-            parent = poseBone.parent
-            if (parent):
-                for i in range(self.beginFrame, self.endFrame + 1):
-                    scene.frame_set(i)
-                    if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
-                        self.IndentWrite(B"")
-                        self.WriteBoneQuaternion((parent.matrix.inverted() @ poseBone.matrix).to_quaternion())
-                    else:
-                        self.IndentWrite(B"")
-                        self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
+            # parent = poseBone.parent
+            # if (parent):
+            #     for i in range(self.beginFrame, self.endFrame + 1):
+            #         scene.frame_set(i)
+            #         if (math.fabs(parent.matrix.determinant()) > kExportEpsilon):
+            #             self.IndentWrite(B"")
+            #             self.WriteBoneQuaternion((parent.matrix.inverted() @ poseBone.matrix).to_quaternion())
+            #         else:
+            #             self.IndentWrite(B"")
+            #             self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
 
-                    if i == self.endFrame:
-                        self.Write(B"\n")
-                        break
+            #         if i == self.endFrame:
+            #             self.Write(B"\n")
+            #             break
 
-                    self.Write(B",\n")
+            #         self.Write(B",\n")
 
-            else:
-                for i in range(self.beginFrame, self.endFrame):
-                    scene.frame_set(i)
-                    self.IndentWrite(B"")
-                    self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
-                    self.Write(B",\n")
+            # else:
+            #     for i in range(self.beginFrame, self.endFrame):
+            #         scene.frame_set(i)
+            #         self.IndentWrite(B"")
+            #         self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
+            #         self.Write(B",\n")
 
-                scene.frame_set(self.endFrame)
+            #     scene.frame_set(self.endFrame)
+            #     self.IndentWrite(B"")
+            #     self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
+            #     self.Write(B"\n")
+
+            for i in range(self.beginFrame, self.endFrame):
+                scene.frame_set(i)
                 self.IndentWrite(B"")
-                self.WriteBoneQuaternion(poseBone.matrix.to_quaternion())
-                self.Write(B"\n")
+                self.WriteQuaternion(poseBone.matrix_basis.to_quaternion())
+                self.Write(B",\n")
+
+            scene.frame_set(self.endFrame)
+            self.IndentWrite(B"")
+            self.WriteQuaternion(poseBone.matrix_basis.to_quaternion())
+            self.Write(B"\n")
 
             self.indentLevel -= 1
             self.IndentWrite(B"]\n")
