@@ -1402,16 +1402,30 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.indentLevel += 1
 
             # BONESTUFF
-            par_mat_inv = poseBone.bone.parent.matrix_local.inverted_safe() if poseBone.bone.parent else worldToBoneSpace
+            # for i in range(self.beginFrame, self.endFrame):
+            #     scene.frame_set(i)
+            #     self.IndentWrite(B"")
+            #     par_mat_inv = poseBone.bone.parent.matrix_local.inverted_safe() if poseBone.bone.parent else worldToBoneSpace
+            #     self.WriteBoneVector3D((par_mat_inv @ poseBone.bone.matrix_local @ poseBone.matrix_basis).translation)
+            #     self.Write(B",\n")
+
+            # scene.frame_set(self.endFrame)
+            # self.IndentWrite(B"")
+            # par_mat_inv = poseBone.bone.parent.matrix_local.inverted_safe() if poseBone.bone.parent else worldToBoneSpace
+            # self.WriteBoneVector3D((par_mat_inv @ poseBone.bone.matrix_local @ poseBone.matrix_basis).translation)
+            # self.Write(B"\n")
+
             for i in range(self.beginFrame, self.endFrame):
                 scene.frame_set(i)
                 self.IndentWrite(B"")
-                self.WriteBoneVector3D((par_mat_inv @ poseBone.bone.matrix_local @ poseBone.matrix_basis).translation)
+                par_mat_inv = poseBone.parent.matrix.inverted_safe() if poseBone.bone.parent else worldToBoneSpace
+                self.WriteBoneVector3D((par_mat_inv @ poseBone.matrix).translation)
                 self.Write(B",\n")
 
             scene.frame_set(self.endFrame)
             self.IndentWrite(B"")
-            self.WriteBoneVector3D((par_mat_inv @ poseBone.bone.matrix_local @ poseBone.matrix_basis).translation)
+            par_mat_inv = poseBone.parent.matrix.inverted_safe() if poseBone.bone.parent else worldToBoneSpace
+            self.WriteBoneVector3D((par_mat_inv @ poseBone.matrix).translation)
             self.Write(B"\n")
 
             self.indentLevel -= 1
@@ -1529,7 +1543,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             #----------------------------------------------------------------
 
-            # BONESTUFF
             # for i in range(self.beginFrame, self.endFrame):
             #     scene.frame_set(i)
             #     self.IndentWrite(B"")
@@ -1542,14 +1555,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             # self.Write(B"\n")
 
             #----------------------------------------------------------------
-            # BONESTUFF
 
             # TODO: This one makes squat work, but wave break...
-
-            par_mat_inv = poseBone.parent.matrix.inverted_safe() if poseBone.parent else worldToBoneSpace
             for i in range(self.beginFrame, self.endFrame):
                 scene.frame_set(i)
                 self.IndentWrite(B"")
+                par_mat_inv = poseBone.parent.matrix.inverted_safe() if poseBone.parent else worldToBoneSpace
                 self.WriteBoneQuaternion((par_mat_inv @ poseBone.matrix).to_quaternion())
                 self.Write(B",\n")
 
@@ -1775,11 +1786,16 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
 
             # BONESTUFF
             # Node transform, relative to parent OBJECT (this means the armature, not the bone!), in world space
+
+            # when bone is offset in edit mode after an object is parented, the following matrices contain proper translation in armature space:
+            # poseBone.matrix
+            # bone.matrix_local
             if (poseBone):
                 bone_armature_mat = poseBone.matrix
                 bone_armature_mat_inv = bone_armature_mat.inverted_safe()
 
-                node_armature_mat = node.matrix_parent_inverse.inverted_safe() @ node.matrix_local
+                #node_armature_mat = node.matrix_parent_inverse.inverted_safe() @ node.matrix_local
+                node_armature_mat = node.parent.matrix_world.inverted() @ node.matrix_world
                 node_local_mat = bone_armature_mat_inv @ node_armature_mat
 
                 transform = boneToWorldSpace @ node_local_mat
@@ -1787,14 +1803,15 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 rot = transform.to_quaternion()
 
                 self.IndentWrite(B"translation: ")
-                self.WriteBoneVector3D(pos)
+                self.WriteVector3D(pos)
                 self.Write(B"\n")
 
                 self.IndentWrite(B"rotation: ")
-                self.WriteBoneQuaternion(rot)
+                self.WriteQuaternion(rot)
                 self.Write(B"\n")
             else:
-                transform = node.matrix_local
+                par_mat_inv = node.parent.matrix_world.inverted_safe() if node.parent else mathutils.Matrix()
+                transform = par_mat_inv @ node.matrix_world
 
                 pos = transform.translation
                 rot = transform.to_quaternion()
