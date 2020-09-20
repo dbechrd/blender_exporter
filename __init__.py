@@ -2241,7 +2241,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.geometryArray[object]["nodeTable"].append(node)
 
                 self.IndentWrite(B"mesh: ")
-                self.WriteString(object.name)
+                self.WriteString(self.namespace + 'mesh.' + object.name)
                 self.Write(B"\n")
 
                 self.IndentWrite(B"materials: [\n")
@@ -2252,7 +2252,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.materialArray[material] = {"structName" : bytes("material" + str(len(self.materialArray) + 1), "UTF-8")}
 
                     self.IndentWrite(B"")
-                    self.WriteString(node.material_slots[i].material.name)
+                    self.WriteString(self.namespace + 'material.' + node.material_slots[i].material.name)
                     if i < len(node.material_slots) - 1:
                         self.Write(B",")
                     self.Write(B"\n")
@@ -2271,7 +2271,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.lightArray[object]["nodeTable"].append(node)
 
                 self.IndentWrite(B"light: ")
-                self.WriteString(object.name)
+                self.WriteString(self.namespace + 'light.' + object.name)
                 self.Write(B"\n")
 
             elif (type == kNodeTypeCamera):
@@ -2281,7 +2281,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                     self.cameraArray[object]["nodeTable"].append(node)
 
                 self.IndentWrite(B"camera: ")
-                self.WriteString(object.name)
+                self.WriteString(self.namespace + 'camera.' + object.name)
                 self.Write(B"\n")
 
             # Export the transform. If the node is animated, then animation tracks are exported here.
@@ -2341,7 +2341,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             boneRef = self.FindNode(boneArray[i].name)
             if (boneRef):
                 self.IndentWrite(B"")
-                self.WriteString(boneArray[i].name)
+                self.WriteString(self.namespace + 'bone.' + boneArray[i].name)
             else:
                 self.IndentWrite(B"")
                 self.Write(B"null")
@@ -2381,9 +2381,12 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel += 1
 
         for i in range(boneCount):
+            bone = boneArray[i]
+
             self.IndentWrite(B"")
-            #self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
-            self.WriteQuaternion(armature.rotation_quaternion @ boneArray[i].matrix_local.to_quaternion())
+            mat = armature.matrix_world @ worldToBoneSpace @ boneArray[i].matrix_local
+            self.WriteBoneQuaternion(mat.to_quaternion())
+
             if (i < boneCount - 1):
                 self.Write(B",\n")
             else:
@@ -3002,8 +3005,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.ExportCamera(objectRef)
 
     def ExportTexture(self, texture, attrib):
-        ogex_base = os.path.basename(self.filepath)
-        filename = texture.filename(ogex_base)
+        filename = texture.filename(self.namespace)
         directory = os.path.dirname(self.filepath)
         path = os.path.join(directory, filename)
 
@@ -3016,7 +3018,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         self.indentLevel += 1
 
         self.IndentWrite(B"name: ")
-        self.WriteFileName(self.namespace + 'texture.' + filename)
+        self.WriteFileName(texture.name(self.namespace))
         self.Write(B"\n")
 
         self.IndentWrite(B"path: ")
@@ -3123,7 +3125,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.WriteString(self.namespace + 'material.' + (material.name or materialRef[1]["structName"]))
             self.Write(B"\n")
 
-            ogex_base = os.path.basename(self.filepath)
             # TODO(dlb): Export factors if textures don't exist? Or both? Mix? Something?
             # TODO(dlb): Pack channels during export?
             if (alpha_factor):
@@ -3132,7 +3133,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (alpha_texture):
                 self.IndentWrite(B"alpha_texture: ")
-                self.WriteFileName(alpha_texture.filename(ogex_base))
+                self.WriteFileName(alpha_texture.name(self.namespace))
                 self.Write(B"\n")
             if (albedo_factor):
                 self.IndentWrite(B"albedo_factor: ")
@@ -3140,7 +3141,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (albedo_texture):
                 self.IndentWrite(B"albedo_texture: ")
-                self.WriteFileName(albedo_texture.filename(ogex_base))
+                self.WriteFileName(albedo_texture.name(self.namespace))
                 self.Write(B"\n")
             if (emissive_factor):
                 self.IndentWrite(B"emissive_factor: ")
@@ -3148,7 +3149,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (emissive_texture):
                 self.IndentWrite(B"emissive_texture: ")
-                self.WriteFileName(emissive_texture.filename(ogex_base))
+                self.WriteFileName(emissive_texture.name(self.namespace))
                 self.Write(B"\n")
             if (metallic_factor):
                 self.IndentWrite(B"metallic_factor: ")
@@ -3156,7 +3157,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (metallic_texture):
                 self.IndentWrite(B"metallic_texture: ")
-                self.WriteFileName(metallic_texture.filename(ogex_base))
+                self.WriteFileName(metallic_texture.name(self.namespace))
                 self.Write(B"\n")
             if (normal_factor):
                 self.IndentWrite(B"normal_factor: ")
@@ -3164,7 +3165,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (normal_texture):
                 self.IndentWrite(B"normal_texture: ")
-                self.WriteFileName(normal_texture.filename(ogex_base))
+                self.WriteFileName(normal_texture.name(self.namespace))
                 self.Write(B"\n")
             if (roughness_factor):
                 self.IndentWrite(B"roughness_factor: ")
@@ -3172,7 +3173,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
                 self.Write(B"\n")
             if (roughness_texture):
                 self.IndentWrite(B"roughness_texture: ")
-                self.WriteFileName(roughness_texture.filename(ogex_base))
+                self.WriteFileName(roughness_texture.name(self.namespace))
                 self.Write(B"\n")
 
             self.indentLevel -= 1
@@ -3361,10 +3362,13 @@ class TextureInfo:
         self.index = index
         self.tex_coord = tex_coord
 
-    def filename(self, filepath):
+    def filename(self, prefix):
         uri = self.index.source.uri
-        filename = f"{filepath}_{uri.name}{uri.file_extension}"
+        filename = f"{prefix}{uri.name}{uri.file_extension}"
         return filename
+
+    def name(self, namespace):
+        return namespace + 'texture.' + self.index.source.uri.name
 
     def data(self):
         return self.index.source.uri.data
