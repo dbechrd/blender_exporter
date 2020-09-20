@@ -2364,7 +2364,9 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         for i in range(boneCount):
             self.IndentWrite(B"")
             #self.WriteMatrixFlat(armature.matrix_world @ boneArray[i].matrix_local)
-            self.WriteVector3D(armature.location + boneArray[i].head_local)
+            #self.WriteVector3D(armature.location + boneArray[i].head_local)
+            mat = armature.matrix_world @ worldToBoneSpace @ boneArray[i].matrix_local
+            self.WriteBoneVector3D(mat.translation)
             if (i < boneCount - 1):
                 self.Write(B",\n")
             else:
