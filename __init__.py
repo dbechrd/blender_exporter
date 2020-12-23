@@ -1152,7 +1152,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         for i in range(self.beginFrame, self.endFrame):
             scene.frame_set(i)
             m2 = node.matrix_local
-            if (OpenGexExporter.MatricesDifferent(m1, m2)):
+            if (self.sampleAnimationFlag or OpenGexExporter.MatricesDifferent(m1, m2)):
                 animationFlag = True
                 break
 
@@ -1240,7 +1240,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         for i in range(self.beginFrame, self.endFrame):
             scene.frame_set(i)
             v2 = poseBone.matrix.translation
-            if (OpenGexExporter.Vec3Different(v1, v2)):
+            if (self.sampleAnimationFlag or OpenGexExporter.Vec3Different(v1, v2)):
                 animationFlag = True
                 break
 
@@ -1351,7 +1351,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
         for i in range(self.beginFrame, self.endFrame):
             scene.frame_set(i)
             v2 = poseBone.matrix.to_quaternion()
-            if (OpenGexExporter.Vec4Different(v1, v2)):
+            if (self.sampleAnimationFlag or OpenGexExporter.Vec4Different(v1, v2)):
                 animationFlag = True
                 break
 
