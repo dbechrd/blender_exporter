@@ -163,7 +163,7 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
     filename_ext = ".ogex"
 
     option_export_selection: bpy.props.BoolProperty(name = "Export Selection Only", description = "Export only selected objects", default = False)
-    option_sample_animation: bpy.props.BoolProperty(name = "Force Sampled Animation", description = "Always export animation as per-frame samples", default = False)
+    option_sample_animation: bpy.props.BoolProperty(name = "Force Sampled Animation", description = "Always export animation as per-frame samples", default = True)
 
     def Write(self, text):
         self.file.write(text)
