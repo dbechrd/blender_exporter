@@ -1193,7 +1193,6 @@ class OpenGexExporter(bpy.types.Operator, ExportHelper):
             self.indentLevel -= 1
             self.IndentWrite(B"}\n")
 
-            self.indentLevel -= 1
             self.IndentWrite(B"value: {\n")
             self.indentLevel += 1
             self.IndentWrite(B"curve: \"linear\"\n")
